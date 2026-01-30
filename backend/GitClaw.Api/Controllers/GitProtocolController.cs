@@ -110,22 +110,24 @@ public class GitProtocolController : ControllerBase
     /// Handles git clone, fetch, pull (sending data to client)
     /// </summary>
     [HttpPost("git-upload-pack")]
-    public async Task<IActionResult> PostUploadPack(string owner, string repo)
+    public async Task PostUploadPack(string owner, string repo)
     {
         var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
         
         if (!Directory.Exists(repoPath))
         {
-            return NotFound("Repository not found");
+            Response.StatusCode = 404;
+            await Response.WriteAsync("Repository not found");
+            return;
         }
         
         try
         {
             // Set response headers
-            Response.Headers.Append("Content-Type", "application/x-git-upload-pack-result");
-            Response.Headers.Append("Cache-Control", "no-cache");
+            Response.ContentType = "application/x-git-upload-pack-result";
+            Response.Headers.CacheControl = "no-cache";
             
-            // Run git-upload-pack
+            // Run git upload-pack
             var processInfo = new ProcessStartInfo
             {
                 FileName = "git",
@@ -141,26 +143,37 @@ public class GitProtocolController : ControllerBase
             using var process = Process.Start(processInfo);
             if (process == null)
             {
-                return StatusCode(500, "Failed to start git process");
+                Response.StatusCode = 500;
+                await Response.WriteAsync("Failed to start git process");
+                return;
             }
             
             // Copy request body to git process stdin
-            await Request.Body.CopyToAsync(process.StandardInput.BaseStream);
+            var copyTask = Request.Body.CopyToAsync(process.StandardInput.BaseStream);
+            
+            // Stream git output to response simultaneously
+            var streamTask = process.StandardOutput.BaseStream.CopyToAsync(Response.Body);
+            
+            await Task.WhenAll(copyTask, streamTask);
             process.StandardInput.Close();
             
-            // Stream git output to response
-            await process.StandardOutput.BaseStream.CopyToAsync(Response.Body);
             await process.WaitForExitAsync();
             await Response.Body.FlushAsync();
             
-            _logger.LogInformation("Served upload-pack for {Owner}/{Repo}", owner, repo);
+            var stderr = await process.StandardError.ReadToEndAsync();
+            if (!string.IsNullOrEmpty(stderr))
+            {
+                _logger.LogWarning("Git upload-pack stderr: {Stderr}", stderr);
+            }
             
-            return new EmptyResult();
+            _logger.LogInformation("Served upload-pack for {Owner}/{Repo}, exit code: {ExitCode}", 
+                owner, repo, process.ExitCode);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in upload-pack for {Owner}/{Repo}", owner, repo);
-            return StatusCode(500, "Internal server error");
+            Response.StatusCode = 500;
+            await Response.WriteAsync("Internal server error");
         }
     }
     
@@ -169,22 +182,24 @@ public class GitProtocolController : ControllerBase
     /// Handles git push (receiving data from client)
     /// </summary>
     [HttpPost("git-receive-pack")]
-    public async Task<IActionResult> PostReceivePack(string owner, string repo)
+    public async Task PostReceivePack(string owner, string repo)
     {
         var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
         
         if (!Directory.Exists(repoPath))
         {
-            return NotFound("Repository not found");
+            Response.StatusCode = 404;
+            await Response.WriteAsync("Repository not found");
+            return;
         }
         
         try
         {
             // Set response headers
-            Response.Headers.Append("Content-Type", "application/x-git-receive-pack-result");
-            Response.Headers.Append("Cache-Control", "no-cache");
+            Response.ContentType = "application/x-git-receive-pack-result";
+            Response.Headers.CacheControl = "no-cache";
             
-            // Run git-receive-pack
+            // Run git receive-pack
             var processInfo = new ProcessStartInfo
             {
                 FileName = "git",
@@ -200,26 +215,37 @@ public class GitProtocolController : ControllerBase
             using var process = Process.Start(processInfo);
             if (process == null)
             {
-                return StatusCode(500, "Failed to start git process");
+                Response.StatusCode = 500;
+                await Response.WriteAsync("Failed to start git process");
+                return;
             }
             
             // Copy request body to git process stdin
-            await Request.Body.CopyToAsync(process.StandardInput.BaseStream);
+            var copyTask = Request.Body.CopyToAsync(process.StandardInput.BaseStream);
+            
+            // Stream git output to response simultaneously
+            var streamTask = process.StandardOutput.BaseStream.CopyToAsync(Response.Body);
+            
+            await Task.WhenAll(copyTask, streamTask);
             process.StandardInput.Close();
             
-            // Stream git output to response
-            await process.StandardOutput.BaseStream.CopyToAsync(Response.Body);
             await process.WaitForExitAsync();
             await Response.Body.FlushAsync();
             
-            _logger.LogInformation("Served receive-pack (push) for {Owner}/{Repo}", owner, repo);
+            var stderr = await process.StandardError.ReadToEndAsync();
+            if (!string.IsNullOrEmpty(stderr))
+            {
+                _logger.LogWarning("Git receive-pack stderr: {Stderr}", stderr);
+            }
             
-            return new EmptyResult();
+            _logger.LogInformation("Served receive-pack (push) for {Owner}/{Repo}, exit code: {ExitCode}", 
+                owner, repo, process.ExitCode);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in receive-pack for {Owner}/{Repo}", owner, repo);
-            return StatusCode(500, "Internal server error");
+            Response.StatusCode = 500;
+            await Response.WriteAsync("Internal server error");
         }
     }
     
