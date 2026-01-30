@@ -24,63 +24,84 @@ public class GitProtocolController : ControllerBase
     /// Used for git clone, fetch, pull
     /// </summary>
     [HttpGet("info/refs")]
-    public async Task<IActionResult> GetInfoRefs(string owner, string repo, [FromQuery] string service)
+    public async Task GetInfoRefs(string owner, string repo, [FromQuery] string service)
     {
         var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
         
         if (!Directory.Exists(repoPath))
         {
-            return NotFound("Repository not found");
+            Response.StatusCode = 404;
+            await Response.WriteAsync("Repository not found");
+            return;
         }
         
         // Validate service
         if (service != "git-upload-pack" && service != "git-receive-pack")
         {
-            return BadRequest("Invalid service");
+            Response.StatusCode = 400;
+            await Response.WriteAsync("Invalid service");
+            return;
         }
         
         try
         {
             // Set response headers for git smart HTTP
-            Response.Headers.Append("Content-Type", $"application/x-{service}-advertisement");
-            Response.Headers.Append("Cache-Control", "no-cache");
+            Response.ContentType = $"application/x-{service}-advertisement";
+            Response.Headers.CacheControl = "no-cache";
             
             // Run git service to get refs
+            // Remove "git-" prefix from service name (git-upload-pack -> upload-pack)
+            var gitCommand = service.Replace("git-", "");
             var processInfo = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = $"{service} --stateless-rpc --advertise-refs \"{repoPath}\"",
+                Arguments = $"{gitCommand} --stateless-rpc --advertise-refs .",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = repoPath
+                WorkingDirectory = repoPath,
+                CreateNoWindow = true
             };
             
             using var process = Process.Start(processInfo);
             if (process == null)
             {
-                return StatusCode(500, "Failed to start git process");
+                Response.StatusCode = 500;
+                await Response.WriteAsync("Failed to start git process");
+                return;
             }
             
-            // Write packet header
-            var packetHeader = $"# service={service}\n";
-            var packetLength = (packetHeader.Length + 4).ToString("x4");
-            await Response.BodyWriter.WriteAsync(System.Text.Encoding.UTF8.GetBytes(packetLength));
-            await Response.BodyWriter.WriteAsync(System.Text.Encoding.UTF8.GetBytes(packetHeader));
-            await Response.BodyWriter.WriteAsync(System.Text.Encoding.UTF8.GetBytes("0000"));
-            
-            // Stream git output
-            await process.StandardOutput.BaseStream.CopyToAsync(Response.BodyWriter.AsStream());
+            // Read git output first
+            var gitOutput = await process.StandardOutput.ReadToEndAsync();
+            var gitError = await process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
             
-            _logger.LogInformation("Served {Service} refs for {Owner}/{Repo}", service, owner, repo);
+            _logger.LogInformation("Git exit code: {ExitCode}, stdout length: {StdoutLen}, stderr: {Stderr}", 
+                process.ExitCode, gitOutput.Length, gitError);
             
-            return new EmptyResult();
+            // Write packet header manually
+            var packetHeader = $"# service={service}\n";
+            var packetLength = (packetHeader.Length + 4).ToString("x4");
+            
+            await Response.Body.WriteAsync(System.Text.Encoding.UTF8.GetBytes(packetLength));
+            await Response.Body.WriteAsync(System.Text.Encoding.UTF8.GetBytes(packetHeader));
+            await Response.Body.WriteAsync(System.Text.Encoding.UTF8.GetBytes("0000"));
+            
+            // Write git output
+            if (!string.IsNullOrEmpty(gitOutput))
+            {
+                await Response.Body.WriteAsync(System.Text.Encoding.UTF8.GetBytes(gitOutput));
+            }
+            
+            await Response.Body.FlushAsync();
+            
+            _logger.LogInformation("Served {Service} refs for {Owner}/{Repo}", service, owner, repo);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error serving info/refs for {Owner}/{Repo}", owner, repo);
-            return StatusCode(500, "Internal server error");
+            Response.StatusCode = 500;
+            await Response.WriteAsync("Internal server error");
         }
     }
     
@@ -108,12 +129,13 @@ public class GitProtocolController : ControllerBase
             var processInfo = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = $"upload-pack --stateless-rpc \"{repoPath}\"",
+                Arguments = "upload-pack --stateless-rpc .",
                 UseShellExecute = false,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = repoPath
+                WorkingDirectory = repoPath,
+                CreateNoWindow = true
             };
             
             using var process = Process.Start(processInfo);
@@ -127,8 +149,9 @@ public class GitProtocolController : ControllerBase
             process.StandardInput.Close();
             
             // Stream git output to response
-            await process.StandardOutput.BaseStream.CopyToAsync(Response.BodyWriter.AsStream());
+            await process.StandardOutput.BaseStream.CopyToAsync(Response.Body);
             await process.WaitForExitAsync();
+            await Response.Body.FlushAsync();
             
             _logger.LogInformation("Served upload-pack for {Owner}/{Repo}", owner, repo);
             
@@ -165,12 +188,13 @@ public class GitProtocolController : ControllerBase
             var processInfo = new ProcessStartInfo
             {
                 FileName = "git",
-                Arguments = $"receive-pack --stateless-rpc \"{repoPath}\"",
+                Arguments = "receive-pack --stateless-rpc .",
                 UseShellExecute = false,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                WorkingDirectory = repoPath
+                WorkingDirectory = repoPath,
+                CreateNoWindow = true
             };
             
             using var process = Process.Start(processInfo);
@@ -184,8 +208,9 @@ public class GitProtocolController : ControllerBase
             process.StandardInput.Close();
             
             // Stream git output to response
-            await process.StandardOutput.BaseStream.CopyToAsync(Response.BodyWriter.AsStream());
+            await process.StandardOutput.BaseStream.CopyToAsync(Response.Body);
             await process.WaitForExitAsync();
+            await Response.Body.FlushAsync();
             
             _logger.LogInformation("Served receive-pack (push) for {Owner}/{Repo}", owner, repo);
             
