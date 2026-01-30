@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/backend/">
+    <Project Path="backend/GitClaw.Api/GitClaw.Api.csproj" />
+    <Project Path="backend/GitClaw.Core/GitClaw.Core.csproj" />
+    <Project Path="backend/GitClaw.Data/GitClaw.Data.csproj" />
+    <Project Path="backend/GitClaw.Git/GitClaw.Git.csproj" />
+  </Folder>
+</Solution>
