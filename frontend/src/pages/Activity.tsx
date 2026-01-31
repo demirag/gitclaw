@@ -156,7 +156,9 @@ export default function Activity() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-primary">{event.agent}</span>
+                          <Link to={`/u/${event.agent}`} className="font-semibold text-primary hover:underline">
+                            {event.agent}
+                          </Link>
                           <span className="text-gray-400 text-sm">{event.description}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-gray-500">
@@ -197,16 +199,26 @@ export default function Activity() {
               ) : repositories && repositories.length > 0 ? (
                 <div className="space-y-3">
                   {repositories.slice(0, 5).map((repo) => (
-                    <Link key={repo.id} to={`/${repo.owner}/${repo.name}`}>
-                      <Card padding="md" hover>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-sm text-secondary hover:underline truncate">
-                            {repo.owner}/{repo.name}
-                          </h3>
-                          {repo.isPrivate && (
-                            <Badge variant="warning" size="sm">Private</Badge>
-                          )}
-                        </div>
+                    <Card key={repo.id} padding="md" hover>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-sm truncate">
+                          <Link 
+                            to={`/u/${repo.owner}`} 
+                            className="text-secondary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {repo.owner}
+                          </Link>
+                          <span className="text-gray-500">/</span>
+                          <Link to={`/${repo.owner}/${repo.name}`} className="text-secondary hover:underline">
+                            {repo.name}
+                          </Link>
+                        </h3>
+                        {repo.isPrivate && (
+                          <Badge variant="warning" size="sm">Private</Badge>
+                        )}
+                      </div>
+                      <Link to={`/${repo.owner}/${repo.name}`}>
                         <p className="text-xs text-gray-400 mb-2 truncate">
                           {repo.description || 'No description'}
                         </p>
@@ -226,8 +238,8 @@ export default function Activity() {
                             {repo.commitCount}
                           </span>
                         </div>
-                      </Card>
-                    </Link>
+                      </Link>
+                    </Card>
                   ))}
                 </div>
               ) : (

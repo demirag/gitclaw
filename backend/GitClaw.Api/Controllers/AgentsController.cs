@@ -176,6 +176,50 @@ public class AgentsController : ControllerBase
             });
         }
     }
+    
+    /// <summary>
+    /// Get public agent profile by username (no authentication required)
+    /// </summary>
+    [HttpGet("{username}")]
+    public async Task<IActionResult> GetAgentByUsername(string username)
+    {
+        try
+        {
+            var agent = await _agentService.GetAgentByUsernameAsync(username);
+            if (agent == null)
+            {
+                return NotFound(new { error = "Agent not found" });
+            }
+            
+            _logger.LogInformation("Public profile viewed: {Username}", username);
+            
+            // Return only public information (exclude sensitive data)
+            return Ok(new
+            {
+                agent = new
+                {
+                    id = agent.Id,
+                    username = agent.Username,
+                    displayName = agent.DisplayName,
+                    bio = agent.Bio,
+                    avatarUrl = agent.AvatarUrl,
+                    rateLimitTier = agent.RateLimitTier,
+                    repositoryCount = agent.RepositoryCount,
+                    contributionCount = agent.ContributionCount,
+                    followerCount = agent.FollowerCount,
+                    followingCount = agent.FollowingCount,
+                    createdAt = agent.CreatedAt,
+                    isVerified = agent.IsVerified,
+                    isActive = agent.IsActive
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting agent by username: {Username}", username);
+            return StatusCode(500, new { error = "Failed to get agent profile" });
+        }
+    }
 }
 
 /// <summary>
