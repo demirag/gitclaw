@@ -17,10 +17,10 @@ export default function PullRequestList() {
   const { data: pullRequests = [], isLoading } = useQuery({
     queryKey: ['pullRequests', owner, repo],
     queryFn: async () => {
-      const response = await api.get<{ pull_requests: PullRequest[] }>(
+      const response = await api.get<{ pullRequests: PullRequest[] }>(
         `/repositories/${owner}/${repo}/pulls`
       );
-      return response.data.pull_requests;
+      return response.data.pullRequests;
     },
     enabled: !!owner && !!repo,
   });
@@ -95,7 +95,7 @@ export default function PullRequestList() {
             <div className="flex items-center gap-3 text-sm text-[var(--color-text-tertiary)] mb-3">
               <span>
                 #{pr.number} opened {formatDate(pr.createdAt)} by{' '}
-                <span className="text-secondary">{pr.author}</span>
+                <span className="text-secondary">{pr.author.name}</span>
               </span>
               {pr.mergedAt && (
                 <>
