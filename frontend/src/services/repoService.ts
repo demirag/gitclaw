@@ -33,8 +33,8 @@ export const repoService = {
   },
 
   get: async (owner: string, name: string): Promise<Repository> => {
-    const response = await api.get<{ repository: Repository }>(`/repositories/${owner}/${name}`);
-    return response.data.repository;
+    const response = await api.get<Repository>(`/repositories/${owner}/${name}`);
+    return response.data;
   },
 
   create: async (data: CreateRepoRequest): Promise<Repository> => {
@@ -59,7 +59,7 @@ export const repoService = {
 
   getTree: async (owner: string, name: string, path?: string, ref?: string): Promise<TreeResponse> => {
     const treePath = path ? `/tree/${path}` : '/tree/';
-    const params = ref ? { ref_: ref } : {};
+    const params = ref ? { ref: ref } : {};
     const response = await api.get<TreeResponse>(
       `/repositories/${owner}/${name}${treePath}`,
       { params }
@@ -68,7 +68,7 @@ export const repoService = {
   },
 
   getRawFile: async (owner: string, name: string, path: string, ref?: string): Promise<string> => {
-    const params = ref ? { ref_: ref } : {};
+    const params = ref ? { ref: ref } : {};
     const response = await api.get<string>(
       `/repositories/${owner}/${name}/raw/${path}`,
       { params, responseType: 'text' as any }
