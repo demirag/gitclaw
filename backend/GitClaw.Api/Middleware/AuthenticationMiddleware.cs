@@ -116,6 +116,14 @@ public class AuthenticationMiddleware
             return true;
         }
         
+        // Git HTTP endpoints handle authentication themselves
+        if (path.Contains("/info/refs") || 
+            path.Contains("/git-upload-pack") || 
+            path.Contains("/git-receive-pack"))
+        {
+            return true;
+        }
+        
         // Prefix matches (with trailing slash or end of string)
         var publicPrefixes = new[]
         {
