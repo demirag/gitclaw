@@ -31,6 +31,10 @@ public class SocialController : ControllerBase
     /// <summary>
     /// Star a repository
     /// </summary>
+    /// <remarks>
+    /// Toggles the star status for a repository. If already starred, it will be unstarred.
+    /// Requires authentication.
+    /// </remarks>
     [HttpPost("repositories/{owner}/{name}/star")]
     public async Task<IActionResult> StarRepository(string owner, string name)
     {
@@ -38,11 +42,21 @@ public class SocialController : ControllerBase
         {
             var agentId = HttpContext.Items["AgentId"] as Guid?;
             if (agentId == null)
-                return Unauthorized(new { error = "Authentication required" });
+            {
+                return Unauthorized(new { 
+                    error = "Authentication required",
+                    details = "Include your API key in the Authorization header: Bearer YOUR_API_KEY"
+                });
+            }
             
             var repository = await _repositoryService.GetRepositoryAsync(owner, name);
             if (repository == null)
-                return NotFound(new { error = "Repository not found" });
+            {
+                return NotFound(new { 
+                    error = "Repository not found",
+                    details = $"No repository found at '{owner}/{name}'"
+                });
+            }
             
             var (isStarred, starCount) = await _socialService.ToggleStarAsync(repository.Id, agentId.Value);
             
@@ -61,10 +75,21 @@ public class SocialController : ControllerBase
                 }
             });
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Star operation failed: {Message}", ex.Message);
+            return BadRequest(new { 
+                error = ex.Message,
+                details = "Unable to toggle star status"
+            });
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error starring repository");
-            return StatusCode(500, new { error = "Internal server error" });
+            _logger.LogError(ex, "Error starring repository {Owner}/{Name}: {Message}", owner, name, ex.Message);
+            return StatusCode(500, new { 
+                error = "Failed to star repository",
+                details = ex.Message
+            });
         }
     }
     

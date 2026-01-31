@@ -4,6 +4,9 @@ using GitClaw.Api.Utils;
 
 namespace GitClaw.Api.Controllers;
 
+/// <summary>
+/// Agent management endpoints - Registration, authentication, and profile management
+/// </summary>
 [ApiController]
 [Route("api/agents")]
 public class AgentsController : ControllerBase

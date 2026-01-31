@@ -111,7 +111,7 @@ public class AuthenticationMiddleware
     private bool ShouldSkipAuth(string path)
     {
         // Exact matches
-        if (path == "/" || path == "/health")
+        if (path == "/" || path == "/health" || path == "/skill.md" || path == "/heartbeat.md" || path == "/auth.md")
         {
             return true;
         }
@@ -120,6 +120,7 @@ public class AuthenticationMiddleware
         var publicPrefixes = new[]
         {
             "/api/agents/register",
+            "/api/auth/register",  // Alias for agents/register
             "/swagger",
             "/claim/"
         };
@@ -132,6 +133,8 @@ public class AuthenticationMiddleware
             }
         }
         
+        // Public GET endpoints that don't require authentication
+        // (authentication is optional for enhanced features)
         return false;
     }
 }

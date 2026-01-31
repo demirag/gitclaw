@@ -477,6 +477,12 @@ public class PullRequestsController : ControllerBase
     /// <summary>
     /// Add a comment to a pull request
     /// </summary>
+    /// <remarks>
+    /// Creates a comment on a pull request. Can be a general comment or a line-specific comment.
+    /// 
+    /// For line-specific comments, provide both `filePath` and `lineNumber`.
+    /// For threaded replies, provide `parentCommentId`.
+    /// </remarks>
     [HttpPost("{number}/comments")]
     public async Task<IActionResult> AddComment(
         string owner,
@@ -492,19 +498,52 @@ public class PullRequestsController : ControllerBase
             
             if (agentId == null || agent == null)
             {
-                return Unauthorized(new { error = "Authentication required" });
+                return Unauthorized(new { 
+                    error = "Authentication required",
+                    details = "Include your API key in the Authorization header: Bearer YOUR_API_KEY"
+                });
             }
             
             // Validate request
             if (string.IsNullOrWhiteSpace(request.Body))
             {
-                return BadRequest(new { error = "Comment body is required" });
+                return BadRequest(new { 
+                    error = "Comment body is required",
+                    details = "The 'body' field cannot be empty"
+                });
+            }
+            
+            // Validate line-specific comment has both filePath and lineNumber
+            if ((request.FilePath != null && request.LineNumber == null) ||
+                (request.FilePath == null && request.LineNumber != null))
+            {
+                return BadRequest(new { 
+                    error = "Invalid line-specific comment",
+                    details = "Both 'filePath' and 'lineNumber' must be provided together for line-specific comments"
+                });
             }
             
             var pr = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
             if (pr == null)
             {
-                return NotFound(new { error = "Pull request not found" });
+                return NotFound(new { 
+                    error = "Pull request not found",
+                    details = $"No pull request #{number} found in {owner}/{repo}"
+                });
+            }
+            
+            // Validate parent comment if provided
+            if (request.ParentCommentId.HasValue)
+            {
+                var parentExists = await _dbContext.PullRequestComments
+                    .AnyAsync(c => c.Id == request.ParentCommentId.Value && c.PullRequestId == pr.Id);
+                if (!parentExists)
+                {
+                    return BadRequest(new { 
+                        error = "Parent comment not found",
+                        details = "The specified parentCommentId does not exist in this pull request"
+                    });
+                }
             }
             
             var comment = new PullRequestComment
@@ -524,7 +563,8 @@ public class PullRequestsController : ControllerBase
             _dbContext.PullRequestComments.Add(comment);
             await _dbContext.SaveChangesAsync();
             
-            _logger.LogInformation("Added comment to PR #{Number} for {Owner}/{Repo}",
+            _logger.LogInformation("Added {CommentType} comment to PR #{Number} for {Owner}/{Repo}",
+                request.FilePath != null ? "line-specific" : "general",
                 number, owner, repo);
             
             return Created($"/api/repositories/{owner}/{repo}/pulls/{number}/comments/{comment.Id}", new
@@ -538,15 +578,20 @@ public class PullRequestsController : ControllerBase
                 },
                 filePath = comment.FilePath,
                 lineNumber = comment.LineNumber,
+                isLineSpecific = comment.FilePath != null && comment.LineNumber != null,
                 parentCommentId = comment.ParentCommentId,
+                isReply = comment.ParentCommentId != null,
                 createdAt = comment.CreatedAt,
                 updatedAt = comment.UpdatedAt
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error adding PR comment");
-            return StatusCode(500, new { error = "Internal server error" });
+            _logger.LogError(ex, "Error adding PR comment: {Message}", ex.Message);
+            return StatusCode(500, new { 
+                error = "Failed to add comment",
+                details = ex.Message
+            });
         }
     }
     
@@ -725,8 +770,9 @@ public class PullRequestsController : ControllerBase
                 return Unauthorized(new { error = "Authentication required" });
             }
             
-            // Validate status
-            if (!Enum.TryParse<ReviewStatus>(request.Status, ignoreCase: true, out var status))
+            // Validate status - normalize snake_case to PascalCase for enum parsing
+            var normalizedStatus = request.Status?.Replace("_", "").Replace("-", "") ?? "";
+            if (!Enum.TryParse<ReviewStatus>(normalizedStatus, ignoreCase: true, out var status))
             {
                 return BadRequest(new { error = "Invalid review status. Valid values: pending, approved, changes_requested, commented" });
             }
@@ -783,11 +829,31 @@ public record CreatePullRequestRequest(
     string SourceBranch,
     string TargetBranch);
 
-public record CreateCommentRequest(
-    string Body,
-    string? FilePath = null,
-    int? LineNumber = null,
-    Guid? ParentCommentId = null);
+/// <summary>
+/// Request model for creating a pull request comment
+/// </summary>
+public class CreateCommentRequest
+{
+    /// <summary>
+    /// The comment body (required)
+    /// </summary>
+    public string Body { get; set; } = string.Empty;
+    
+    /// <summary>
+    /// Optional file path for line-specific comments (e.g., "src/main.cs")
+    /// </summary>
+    public string? FilePath { get; set; }
+    
+    /// <summary>
+    /// Optional line number for line-specific comments
+    /// </summary>
+    public int? LineNumber { get; set; }
+    
+    /// <summary>
+    /// Optional parent comment ID for threaded replies
+    /// </summary>
+    public Guid? ParentCommentId { get; set; }
+}
 
 public record UpdateCommentRequest(string? Body);
 

@@ -92,6 +92,11 @@ public class RepositoriesController : ControllerBase
     /// <summary>
     /// Create a new repository
     /// </summary>
+    /// <remarks>
+    /// Creates a new git repository. Requires authentication.
+    /// 
+    /// The owner should match your agent username for full permissions.
+    /// </remarks>
     [HttpPost]
     public async Task<IActionResult> CreateRepository([FromBody] CreateRepositoryRequest request)
     {
@@ -100,16 +105,39 @@ public class RepositoriesController : ControllerBase
             // Get authenticated agent
             var agentId = HttpContext.Items["AgentId"] as Guid?;
             
+            if (agentId == null)
+            {
+                return Unauthorized(new { 
+                    error = "Authentication required",
+                    details = "Include your API key in the Authorization header: Bearer YOUR_API_KEY"
+                });
+            }
+            
             // Validate request
             if (string.IsNullOrWhiteSpace(request.Owner) || string.IsNullOrWhiteSpace(request.Name))
             {
-                return BadRequest(new { error = "Owner and name are required" });
+                return BadRequest(new { 
+                    error = "Owner and name are required",
+                    details = "Both 'owner' and 'name' fields must be provided in the request body"
+                });
+            }
+            
+            // Validate owner name
+            if (!InputSanitizer.IsValidUsername(request.Owner))
+            {
+                return BadRequest(new { 
+                    error = "Invalid owner name",
+                    details = "Owner must contain only alphanumeric characters, hyphens, and underscores (1-39 characters)"
+                });
             }
             
             // Validate repository name (alphanumeric, hyphens, underscores only)
             if (!InputSanitizer.IsValidRepositoryName(request.Name))
             {
-                return BadRequest(new { error = "Repository name must contain only alphanumeric characters, hyphens, and underscores (1-100 characters)" });
+                return BadRequest(new { 
+                    error = "Invalid repository name",
+                    details = "Repository name must contain only alphanumeric characters, hyphens, and underscores (1-100 characters)"
+                });
             }
             
             // Sanitize inputs
@@ -120,18 +148,43 @@ public class RepositoriesController : ControllerBase
             // Check if already exists
             if (await _repositoryService.ExistsAsync(sanitizedOwner, sanitizedName))
             {
-                return Conflict(new { error = "Repository already exists" });
+                return Conflict(new { 
+                    error = "Repository already exists",
+                    details = $"A repository named '{sanitizedOwner}/{sanitizedName}' already exists"
+                });
             }
             
             // Generate repository path
             var repoPath = Path.Combine(RepositoryBasePath, sanitizedOwner, $"{sanitizedName}.git");
+            
+            // Ensure the parent directory exists
+            var parentDir = Path.GetDirectoryName(repoPath);
+            if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+            {
+                try
+                {
+                    Directory.CreateDirectory(parentDir);
+                }
+                catch (Exception dirEx)
+                {
+                    _logger.LogError(dirEx, "Failed to create directory for repository: {Path}", parentDir);
+                    return StatusCode(500, new { 
+                        error = "Failed to create repository directory",
+                        details = "Unable to create storage directory. Please contact support."
+                    });
+                }
+            }
             
             // Initialize git repository
             var success = await _gitService.InitializeRepositoryAsync(repoPath);
             
             if (!success)
             {
-                return StatusCode(500, new { error = "Failed to initialize repository" });
+                _logger.LogError("Git initialization failed for repository: {Path}", repoPath);
+                return StatusCode(500, new { 
+                    error = "Failed to initialize git repository",
+                    details = "Git repository initialization failed. Please try again."
+                });
             }
             
             // Create database record
@@ -155,10 +208,22 @@ public class RepositoriesController : ControllerBase
                 createdAt = repository.CreatedAt
             });
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Repository creation conflict");
+            return Conflict(new { 
+                error = ex.Message,
+                details = "A repository with this name already exists"
+            });
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating repository");
-            return StatusCode(500, new { error = "Internal server error" });
+            _logger.LogError(ex, "Error creating repository: {Message}", ex.Message);
+            return StatusCode(500, new { 
+                error = "Failed to create repository",
+                details = ex.Message,
+                hint = "Check that the owner name and repository name are valid"
+            });
         }
     }
     

@@ -132,19 +132,118 @@ public class PullRequestService : IPullRequestService
             return (false, "Pull request is not open");
         }
         
-        // Perform git merge
-        var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repositoryName}.git");
+        // Perform git merge using worktree (bare repos require worktree for merge)
+        var bareRepoPath = Path.Combine(RepositoryBasePath, owner, $"{repositoryName}.git");
+        var worktreePath = Path.Combine(Path.GetTempPath(), $"gitclaw-merge-{Guid.NewGuid()}");
         
         try
         {
-            // Use git merge command
+            // Step 1: Create a temporary worktree for the target branch
+            var addWorktreeResult = await RunGitCommandAsync(bareRepoPath, 
+                $"worktree add \"{worktreePath}\" {pullRequest.TargetBranch}");
+            
+            if (!addWorktreeResult.Success)
+            {
+                return (false, $"Failed to create worktree: {addWorktreeResult.Error}");
+            }
+            
+            try
+            {
+                // Step 2: Merge the source branch in the worktree
+                var mergeResult = await RunGitCommandAsync(worktreePath, 
+                    $"merge --no-ff -m \"Merge pull request #{number}: {pullRequest.Title}\" origin/{pullRequest.SourceBranch}");
+                
+                if (!mergeResult.Success)
+                {
+                    // Check if it's a merge conflict
+                    if (mergeResult.Error?.Contains("CONFLICT") == true || 
+                        mergeResult.Output?.Contains("CONFLICT") == true)
+                    {
+                        // Abort the merge
+                        await RunGitCommandAsync(worktreePath, "merge --abort");
+                        
+                        pullRequest.HasConflicts = true;
+                        pullRequest.IsMergeable = false;
+                        await _dbContext.SaveChangesAsync();
+                        return (false, "Merge conflicts detected. Please resolve conflicts manually.");
+                    }
+                    
+                    return (false, $"Merge failed: {mergeResult.Error}");
+                }
+                
+                // Step 3: Push the merged changes back to the bare repo
+                // The worktree's origin is already the bare repo, so we need to update the branch ref
+                var updateRefResult = await RunGitCommandAsync(worktreePath, 
+                    $"push . HEAD:{pullRequest.TargetBranch}");
+                
+                // For worktrees, we update directly via the ref
+                if (!updateRefResult.Success)
+                {
+                    // Alternative: get the commit SHA and update ref directly
+                    var revParseResult = await RunGitCommandAsync(worktreePath, "rev-parse HEAD");
+                    if (revParseResult.Success && !string.IsNullOrEmpty(revParseResult.Output))
+                    {
+                        var commitSha = revParseResult.Output.Trim();
+                        await RunGitCommandAsync(bareRepoPath, 
+                            $"update-ref refs/heads/{pullRequest.TargetBranch} {commitSha}");
+                    }
+                }
+                
+                // Update pull request
+                pullRequest.Status = PullRequestStatus.Merged;
+                pullRequest.MergedAt = DateTime.UtcNow;
+                pullRequest.MergedBy = mergedBy;
+                pullRequest.MergedByName = mergedByName;
+                pullRequest.UpdatedAt = DateTime.UtcNow;
+                
+                await _dbContext.SaveChangesAsync();
+                
+                return (true, null);
+            }
+            finally
+            {
+                // Step 4: Clean up worktree
+                await RunGitCommandAsync(bareRepoPath, $"worktree remove \"{worktreePath}\" --force");
+                
+                // Also try to delete the directory if it still exists
+                if (Directory.Exists(worktreePath))
+                {
+                    try { Directory.Delete(worktreePath, true); } catch { }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Clean up on error
+            if (Directory.Exists(worktreePath))
+            {
+                try 
+                { 
+                    await RunGitCommandAsync(bareRepoPath, $"worktree remove \"{worktreePath}\" --force");
+                    Directory.Delete(worktreePath, true); 
+                } 
+                catch { }
+            }
+            return (false, $"Merge error: {ex.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// Helper method to run git commands
+    /// </summary>
+    private static async Task<(bool Success, string? Output, string? Error)> RunGitCommandAsync(
+        string workingDirectory, 
+        string arguments)
+    {
+        try
+        {
             var process = new System.Diagnostics.Process
             {
                 StartInfo = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "git",
-                    Arguments = $"merge {pullRequest.SourceBranch}",
-                    WorkingDirectory = repoPath,
+                    Arguments = arguments,
+                    WorkingDirectory = workingDirectory,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -157,34 +256,11 @@ public class PullRequestService : IPullRequestService
             var error = await process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
             
-            if (process.ExitCode != 0)
-            {
-                // Check if it's a merge conflict
-                if (error.Contains("CONFLICT") || output.Contains("CONFLICT"))
-                {
-                    pullRequest.HasConflicts = true;
-                    pullRequest.IsMergeable = false;
-                    await _dbContext.SaveChangesAsync();
-                    return (false, "Merge conflicts detected. Please resolve conflicts manually.");
-                }
-                
-                return (false, $"Merge failed: {error}");
-            }
-            
-            // Update pull request
-            pullRequest.Status = PullRequestStatus.Merged;
-            pullRequest.MergedAt = DateTime.UtcNow;
-            pullRequest.MergedBy = mergedBy;
-            pullRequest.MergedByName = mergedByName;
-            pullRequest.UpdatedAt = DateTime.UtcNow;
-            
-            await _dbContext.SaveChangesAsync();
-            
-            return (true, null);
+            return (process.ExitCode == 0, output, error);
         }
         catch (Exception ex)
         {
-            return (false, $"Merge error: {ex.Message}");
+            return (false, null, ex.Message);
         }
     }
     
