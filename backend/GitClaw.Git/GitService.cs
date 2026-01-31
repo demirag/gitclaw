@@ -50,7 +50,8 @@ public class GitService : IGitService
                     Author = c.Author.Name,
                     Email = c.Author.Email,
                     When = c.Author.When.DateTime
-                });
+                })
+                .ToList(); // Materialize the list while repo is in scope
             
             return Task.FromResult(commits.AsEnumerable());
         }
