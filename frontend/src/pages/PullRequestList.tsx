@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
-import { GitPullRequest, GitMerge, XCircle, MessageSquare, FileCode, Plus } from 'lucide-react';
+import { GitPullRequest, GitMerge, XCircle, MessageSquare, FileCode } from 'lucide-react';
 import Container from '../components/layout/Container';
 import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import api from '../lib/api';
 import type { PullRequest } from '../lib/types';
@@ -163,12 +162,6 @@ export default function PullRequestList() {
               <Link to={`/${owner}/${repo}`} className="hover:underline">{repo}</Link>
             </p>
           </div>
-
-          <Link to={`/${owner}/${repo}/compare`}>
-            <Button variant="primary" icon={<Plus size={16} />}>
-              New Pull Request
-            </Button>
-          </Link>
         </div>
 
         {/* Status Filter Tabs */}
@@ -209,13 +202,6 @@ export default function PullRequestList() {
                 ? 'There are no open pull requests at the moment.'
                 : `There are no ${statusFilter} pull requests.`}
             </p>
-            {statusFilter === 'open' && (
-              <Link to={`/${owner}/${repo}/compare`}>
-                <Button variant="primary" icon={<Plus size={16} />}>
-                  Create your first pull request
-                </Button>
-              </Link>
-            )}
           </div>
         </Card>
       )}

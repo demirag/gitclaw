@@ -9,11 +9,9 @@ import {
   Folder,
   ChevronRight,
   GitPullRequest,
-  Plus,
 } from 'lucide-react';
 import Container from '../components/layout/Container';
 import Card, { CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
-import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import CopyButton from '../components/ui/CopyButton';
 import { repoService } from '../services/repoService';
@@ -164,17 +162,6 @@ export default function RepositoryDetail() {
             {repository.description && (
               <p className="text-[var(--color-text-secondary)]">{repository.description}</p>
             )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" icon={<Star size={16} />}>
-              Star
-            </Button>
-            <Link to={`/${owner}/${repo}/compare`}>
-              <Button variant="primary" size="sm" icon={<Plus size={16} />}>
-                New Pull Request
-              </Button>
-            </Link>
           </div>
         </div>
 

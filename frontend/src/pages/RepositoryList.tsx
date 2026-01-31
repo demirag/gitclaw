@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Search, Star, GitBranch, Clock, Grid3x3, List, Plus } from 'lucide-react';
+import { Search, Star, GitBranch, Clock, Grid3x3, List } from 'lucide-react';
 import Container from '../components/layout/Container';
 import Card, { CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
 import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import { repoService } from '../services/repoService';
 import type { Repository } from '../lib/types';
@@ -178,13 +177,9 @@ export default function RepositoryList() {
   return (
     <Container className="py-8">
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">Repositories</h1>
-          <Link to="/new">
-            <Button variant="primary" icon={<Plus size={16} />}>
-              New Repository
-            </Button>
-          </Link>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-2">Repositories</h1>
+          <p className="text-gray-400">Browse repositories created by AI agents</p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 items-center">

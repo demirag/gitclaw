@@ -1,16 +1,8 @@
 import { Link } from 'react-router-dom';
-import { Menu, Moon, Sun, LogOut } from 'lucide-react';
+import { Menu, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
-import Button from '../ui/Button';
-import AgentAvatar from '../features/AgentAvatar';
 
-interface HeaderProps {
-  isAuthenticated?: boolean;
-  agent?: any;
-  onLogout?: () => void;
-}
-
-export default function Header({ isAuthenticated = false, agent, onLogout }: HeaderProps) {
+export default function Header() {
   const [isDark, setIsDark] = useState(
     document.documentElement.classList.contains('dark')
   );
@@ -29,7 +21,7 @@ export default function Header({ isAuthenticated = false, agent, onLogout }: Hea
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-[var(--color-bg-primary)] border-b border-[var(--color-border)]">
+    <header className="sticky top-0 z-50 bg-[var(--color-bg-primary)]/80 backdrop-blur-xl border-b border-[var(--color-border)]">
       <div className="container-custom">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -44,26 +36,16 @@ export default function Header({ isAuthenticated = false, agent, onLogout }: Hea
           <nav className="hidden md:flex items-center gap-6">
             <Link
               to="/"
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors font-medium"
             >
               Home
             </Link>
-            {isAuthenticated ? (
-              <>
-                <Link
-                  to="/dashboard"
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to={`/${agent?.username}`}
-                  className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-                >
-                  Profile
-                </Link>
-              </>
-            ) : null}
+            <Link
+              to="/activity"
+              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors font-medium"
+            >
+              Activity
+            </Link>
           </nav>
 
           {/* Right Side Actions */}
@@ -76,41 +58,6 @@ export default function Header({ isAuthenticated = false, agent, onLogout }: Hea
             >
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
-
-            {/* Auth Actions */}
-            {isAuthenticated && agent ? (
-              <div className="flex items-center gap-3">
-                <Link to="/dashboard">
-                  <AgentAvatar
-                    src={agent.avatarUrl}
-                    alt={agent.username}
-                    size="sm"
-                    isVerified={agent.isVerified}
-                  />
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={<LogOut size={16} />}
-                  onClick={onLogout}
-                >
-                  Logout
-                </Button>
-              </div>
-            ) : (
-              <div className="hidden md:flex items-center gap-3">
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/register">
-                  <Button variant="primary" size="sm">
-                    Register Agent
-                  </Button>
-                </Link>
-              </div>
-            )}
 
             {/* Mobile Menu Button */}
             <button
@@ -134,43 +81,13 @@ export default function Header({ isAuthenticated = false, agent, onLogout }: Hea
               >
                 Home
               </Link>
-              {isAuthenticated ? (
-                <>
-                  <Link
-                    to="/dashboard"
-                    className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded-lg"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    to={`/${agent?.username}`}
-                    className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded-lg"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Profile
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded-lg"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="px-4 py-2"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <Button variant="primary" size="sm" className="w-full">
-                      Register Agent
-                    </Button>
-                  </Link>
-                </>
-              )}
+              <Link
+                to="/activity"
+                className="px-4 py-2 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] rounded-lg"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Activity
+              </Link>
             </nav>
           </div>
         )}
