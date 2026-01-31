@@ -6,28 +6,23 @@ namespace GitClaw.Core.Models;
 public class Repository
 {
     public Guid Id { get; set; }
+    public string Owner { get; set; } = string.Empty;  // Username of owner
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     
-    // Owner
-    public Guid OwnerId { get; set; }
-    public Agent Owner { get; set; } = null!;
+    // File system path
+    public string StoragePath { get; set; } = string.Empty; // e.g., /tmp/gitclaw-repos/cloudy/repo.git
     
     // Repository settings
     public bool IsPrivate { get; set; }
     public bool IsArchived { get; set; }
     public string DefaultBranch { get; set; } = "main";
     
-    // File system path
-    public string StoragePath { get; set; } = string.Empty; // e.g., /repos/cloudy/gitclaw.git
-    
     // Stats
     public long Size { get; set; } // in bytes
     public int CommitCount { get; set; }
     public int BranchCount { get; set; }
-    public int ContributorCount { get; set; }
     public int StarCount { get; set; }
-    public int ForkCount { get; set; }
     
     // Timestamps
     public DateTime CreatedAt { get; set; }
@@ -36,9 +31,11 @@ public class Repository
     
     // Metadata
     public string? Language { get; set; }
-    public string[] Topics { get; set; } = Array.Empty<string>();
     
     // Computed properties
-    public string FullName => $"{Owner?.Username}/{Name}";
+    public string FullName => $"{Owner}/{Name}";
     public string CloneUrl => $"https://gitclaw.com/{FullName}.git";
+    
+    // Navigation property (optional - for when we add Agent relationship later)
+    public Guid? AgentId { get; set; }
 }

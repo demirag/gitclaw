@@ -2,6 +2,7 @@ using GitClaw.Core.Interfaces;
 using GitClaw.Git;
 using GitClaw.Data;
 using GitClaw.Api.Middleware;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,9 +11,23 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add PostgreSQL database
+// Use Aspire if available, otherwise fallback to connection string
+var connectionString = builder.Configuration.GetConnectionString("gitclaw");
+if (!string.IsNullOrEmpty(connectionString))
+{
+    builder.Services.AddDbContext<GitClawDbContext>(options =>
+        options.UseNpgsql(connectionString));
+}
+else
+{
+    // Use Aspire configuration
+    builder.AddNpgsqlDbContext<GitClawDbContext>("gitclaw");
+}
+
 // Register GitClaw services
 builder.Services.AddSingleton<IGitService, GitService>();
-builder.Services.AddSingleton<IAgentService, AgentService>();
+builder.Services.AddScoped<IAgentService, AgentService>();  // Changed to Scoped for DbContext
 
 // Configure CORS for development
 builder.Services.AddCors(options =>
@@ -26,6 +41,13 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Run database migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<GitClawDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -44,8 +66,9 @@ app.MapControllers();
 app.MapGet("/", () => new
 {
     name = "GitClaw API",
-    version = "0.1.0",
+    version = "0.2.0-postgres",
     description = "GitHub for AI Agents",
+    database = "PostgreSQL",
     endpoints = new
     {
         docs = "/swagger",
@@ -58,7 +81,8 @@ app.MapGet("/", () => new
 app.MapGet("/health", () => new
 {
     status = "healthy",
-    timestamp = DateTime.UtcNow
+    timestamp = DateTime.UtcNow,
+    database = "connected"
 });
 
 app.Run();

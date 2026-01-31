@@ -1,15 +1,19 @@
 using System.Security.Cryptography;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
+using Microsoft.EntityFrameworkCore;
 using BCrypt.Net;
 
 namespace GitClaw.Data;
 
 public class AgentService : IAgentService
 {
-    // In-memory storage (replace with database later)
-    private static readonly List<Agent> _agents = new();
-    private static readonly Dictionary<string, string> _apiKeyToAgentId = new();
+    private readonly GitClawDbContext _dbContext;
+    
+    public AgentService(GitClawDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
     
     /// <summary>
     /// Register a new agent and generate API key
@@ -17,7 +21,7 @@ public class AgentService : IAgentService
     public async Task<(Agent Agent, string ApiKey)> RegisterAgentAsync(string name, string? description = null, string? email = null)
     {
         // Check if username already exists
-        if (_agents.Any(a => a.Username.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        if (await _dbContext.Agents.AnyAsync(a => a.Username == name))
         {
             throw new InvalidOperationException($"Agent with username '{name}' already exists");
         }
@@ -49,11 +53,11 @@ public class AgentService : IAgentService
             LastActiveAt = DateTime.UtcNow
         };
         
-        // Store agent
-        _agents.Add(agent);
-        _apiKeyToAgentId[apiKey] = agent.Id.ToString();
+        // Save to database
+        _dbContext.Agents.Add(agent);
+        await _dbContext.SaveChangesAsync();
         
-        return await Task.FromResult((agent, apiKey));
+        return (agent, apiKey);
     }
     
     /// <summary>
@@ -66,26 +70,17 @@ public class AgentService : IAgentService
             return null;
         }
         
-        // For performance, check cache first (in-memory lookup)
-        if (_apiKeyToAgentId.TryGetValue(apiKey, out var agentId))
-        {
-            var agent = _agents.FirstOrDefault(a => a.Id.ToString() == agentId);
-            if (agent != null)
-            {
-                return await Task.FromResult(agent);
-            }
-        }
+        // Get all agents and check each hash
+        // Note: BCrypt verification must be done in-memory, can't query by hash
+        var agents = await _dbContext.Agents.ToListAsync();
         
-        // Fallback: Check all agents (slower, but handles server restarts)
-        foreach (var agent in _agents)
+        foreach (var agent in agents)
         {
             try
             {
                 if (BCrypt.Net.BCrypt.Verify(apiKey, agent.ApiKeyHash))
                 {
-                    // Update cache
-                    _apiKeyToAgentId[apiKey] = agent.Id.ToString();
-                    return await Task.FromResult(agent);
+                    return agent;
                 }
             }
             catch
@@ -103,8 +98,7 @@ public class AgentService : IAgentService
     /// </summary>
     public async Task<Agent?> GetAgentByIdAsync(Guid id)
     {
-        var agent = _agents.FirstOrDefault(a => a.Id == id);
-        return await Task.FromResult(agent);
+        return await _dbContext.Agents.FindAsync(id);
     }
     
     /// <summary>
@@ -112,9 +106,8 @@ public class AgentService : IAgentService
     /// </summary>
     public async Task<Agent?> GetAgentByUsernameAsync(string username)
     {
-        var agent = _agents.FirstOrDefault(a => 
-            a.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
-        return await Task.FromResult(agent);
+        return await _dbContext.Agents
+            .FirstOrDefaultAsync(a => a.Username == username);
     }
     
     /// <summary>
@@ -122,12 +115,12 @@ public class AgentService : IAgentService
     /// </summary>
     public async Task UpdateLastActiveAsync(Guid agentId)
     {
-        var agent = _agents.FirstOrDefault(a => a.Id == agentId);
+        var agent = await _dbContext.Agents.FindAsync(agentId);
         if (agent != null)
         {
             agent.LastActiveAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
         }
-        await Task.CompletedTask;
     }
     
     /// <summary>
