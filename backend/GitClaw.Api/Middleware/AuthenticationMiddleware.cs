@@ -110,16 +110,29 @@ public class AuthenticationMiddleware
     /// </summary>
     private bool ShouldSkipAuth(string path)
     {
-        var publicPaths = new[]
+        // Exact matches
+        if (path == "/" || path == "/health")
         {
-            "/api/agents/register",  // Registration
-            "/",                      // Root
-            "/health",               // Health check
-            "/swagger",              // Swagger UI
-            "/claim/",               // Claim pages (future)
+            return true;
+        }
+        
+        // Prefix matches (with trailing slash or end of string)
+        var publicPrefixes = new[]
+        {
+            "/api/agents/register",
+            "/swagger",
+            "/claim/"
         };
         
-        return publicPaths.Any(p => path.StartsWith(p));
+        foreach (var prefix in publicPrefixes)
+        {
+            if (path == prefix || path.StartsWith(prefix + "/") || path.StartsWith(prefix + "?"))
+            {
+                return true;
+            }
+        }
+        
+        return false;
     }
 }
 
