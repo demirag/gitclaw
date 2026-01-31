@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using GitClaw.Core.Services;
 using GitClaw.Core.Models;
+using GitClaw.Core.Interfaces;
 
 namespace GitClaw.Api.Controllers;
 
@@ -9,16 +10,19 @@ namespace GitClaw.Api.Controllers;
 public class SocialController : ControllerBase
 {
     private readonly ISocialService _socialService;
-    private readonly Core.Interfaces.IRepositoryService _repositoryService;
+    private readonly IRepositoryService _repositoryService;
+    private readonly IAgentService _agentService;
     private readonly ILogger<SocialController> _logger;
     
     public SocialController(
         ISocialService socialService,
-        Core.Interfaces.IRepositoryService repositoryService,
+        IRepositoryService repositoryService,
+        IAgentService agentService,
         ILogger<SocialController> logger)
     {
         _socialService = socialService;
         _repositoryService = repositoryService;
+        _agentService = agentService;
         _logger = logger;
     }
     
@@ -116,34 +120,42 @@ public class SocialController : ControllerBase
     {
         try
         {
-            // TODO: Get agent by username (need agent service)
-            // For now, use authenticated agent if username is "me"
+            Guid agentId;
+            
+            // Support "me" for authenticated users
             if (username == "me")
             {
-                var agentId = HttpContext.Items["AgentId"] as Guid?;
-                if (agentId == null)
+                var authAgentId = HttpContext.Items["AgentId"] as Guid?;
+                if (authAgentId == null)
                     return Unauthorized(new { error = "Authentication required" });
-                
-                var repositories = await _socialService.GetStarredRepositoriesAsync(agentId.Value);
-                
-                return Ok(new
-                {
-                    username = "me",
-                    starred = repositories.Select(r => new
-                    {
-                        id = r.Id,
-                        owner = r.Owner,
-                        name = r.Name,
-                        fullName = r.FullName,
-                        description = r.Description,
-                        starCount = r.StarCount,
-                        watcherCount = r.WatcherCount,
-                        forkCount = r.ForkCount
-                    })
-                });
+                agentId = authAgentId.Value;
+            }
+            else
+            {
+                // Public access by username
+                var agent = await _agentService.GetAgentByUsernameAsync(username);
+                if (agent == null)
+                    return NotFound(new { error = "Agent not found" });
+                agentId = agent.Id;
             }
             
-            return NotFound(new { error = "Agent not found" });
+            var repositories = await _socialService.GetStarredRepositoriesAsync(agentId);
+            
+            return Ok(new
+            {
+                username,
+                starred = repositories.Select(r => new
+                {
+                    id = r.Id,
+                    owner = r.Owner,
+                    name = r.Name,
+                    fullName = r.FullName,
+                    description = r.Description,
+                    starCount = r.StarCount,
+                    watcherCount = r.WatcherCount,
+                    forkCount = r.ForkCount
+                })
+            });
         }
         catch (Exception ex)
         {
@@ -246,32 +258,42 @@ public class SocialController : ControllerBase
     {
         try
         {
+            Guid agentId;
+            
+            // Support "me" for authenticated users
             if (username == "me")
             {
-                var agentId = HttpContext.Items["AgentId"] as Guid?;
-                if (agentId == null)
+                var authAgentId = HttpContext.Items["AgentId"] as Guid?;
+                if (authAgentId == null)
                     return Unauthorized(new { error = "Authentication required" });
-                
-                var repositories = await _socialService.GetWatchedRepositoriesAsync(agentId.Value);
-                
-                return Ok(new
-                {
-                    username = "me",
-                    watching = repositories.Select(r => new
-                    {
-                        id = r.Id,
-                        owner = r.Owner,
-                        name = r.Name,
-                        fullName = r.FullName,
-                        description = r.Description,
-                        starCount = r.StarCount,
-                        watcherCount = r.WatcherCount,
-                        forkCount = r.ForkCount
-                    })
-                });
+                agentId = authAgentId.Value;
+            }
+            else
+            {
+                // Public access by username
+                var agent = await _agentService.GetAgentByUsernameAsync(username);
+                if (agent == null)
+                    return NotFound(new { error = "Agent not found" });
+                agentId = agent.Id;
             }
             
-            return NotFound(new { error = "Agent not found" });
+            var repositories = await _socialService.GetWatchedRepositoriesAsync(agentId);
+            
+            return Ok(new
+            {
+                username,
+                watching = repositories.Select(r => new
+                {
+                    id = r.Id,
+                    owner = r.Owner,
+                    name = r.Name,
+                    fullName = r.FullName,
+                    description = r.Description,
+                    starCount = r.StarCount,
+                    watcherCount = r.WatcherCount,
+                    forkCount = r.ForkCount
+                })
+            });
         }
         catch (Exception ex)
         {
@@ -379,37 +401,47 @@ public class SocialController : ControllerBase
     {
         try
         {
+            Guid agentId;
+            
+            // Support "me" for authenticated users
             if (username == "me")
             {
-                var agentId = HttpContext.Items["AgentId"] as Guid?;
-                if (agentId == null)
+                var authAgentId = HttpContext.Items["AgentId"] as Guid?;
+                if (authAgentId == null)
                     return Unauthorized(new { error = "Authentication required" });
-                
-                var pins = await _socialService.GetPinnedRepositoriesAsync(agentId.Value);
-                
-                return Ok(new
-                {
-                    username = "me",
-                    pins = pins.Select(p => new
-                    {
-                        order = p.Order,
-                        pinnedAt = p.PinnedAt,
-                        repository = new
-                        {
-                            id = p.Repository.Id,
-                            owner = p.Repository.Owner,
-                            name = p.Repository.Name,
-                            fullName = p.Repository.FullName,
-                            description = p.Repository.Description,
-                            starCount = p.Repository.StarCount,
-                            watcherCount = p.Repository.WatcherCount,
-                            forkCount = p.Repository.ForkCount
-                        }
-                    })
-                });
+                agentId = authAgentId.Value;
+            }
+            else
+            {
+                // Public access by username
+                var agent = await _agentService.GetAgentByUsernameAsync(username);
+                if (agent == null)
+                    return NotFound(new { error = "Agent not found" });
+                agentId = agent.Id;
             }
             
-            return NotFound(new { error = "Agent not found" });
+            var pins = await _socialService.GetPinnedRepositoriesAsync(agentId);
+            
+            return Ok(new
+            {
+                username,
+                pins = pins.Select(p => new
+                {
+                    order = p.Order,
+                    pinnedAt = p.PinnedAt,
+                    repository = new
+                    {
+                        id = p.Repository.Id,
+                        owner = p.Repository.Owner,
+                        name = p.Repository.Name,
+                        fullName = p.Repository.FullName,
+                        description = p.Repository.Description,
+                        starCount = p.Repository.StarCount,
+                        watcherCount = p.Repository.WatcherCount,
+                        forkCount = p.Repository.ForkCount
+                    }
+                })
+            });
         }
         catch (Exception ex)
         {

@@ -65,31 +65,39 @@ export default function RepositoryList() {
   };
 
   const RepositoryCard = ({ repo }: { repo: Repository }) => (
-    <Link to={`/${repo.owner}/${repo.name}`}>
-      <Card hover padding="md">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <CardTitle className="truncate">
-                <span className="text-secondary">{repo.owner}</span>
-                <span className="text-[var(--color-text-tertiary)]"> / </span>
-                <span>{repo.name}</span>
-              </CardTitle>
-              {repo.isPrivate && (
-                <Badge variant="warning" size="sm" className="ml-2">
-                  Private
-                </Badge>
-              )}
-              {repo.isArchived && (
-                <Badge variant="default" size="sm" className="ml-2">
-                  Archived
-                </Badge>
-              )}
-            </div>
+    <Card hover padding="md">
+      <CardHeader>
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="truncate">
+              <Link 
+                to={`/u/${repo.owner}`} 
+                className="text-secondary hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {repo.owner}
+              </Link>
+              <span className="text-[var(--color-text-tertiary)]"> / </span>
+              <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
+                {repo.name}
+              </Link>
+            </CardTitle>
+            {repo.isPrivate && (
+              <Badge variant="warning" size="sm" className="ml-2">
+                Private
+              </Badge>
+            )}
+            {repo.isArchived && (
+              <Badge variant="default" size="sm" className="ml-2">
+                Archived
+              </Badge>
+            )}
           </div>
-        </CardHeader>
+        </div>
+      </CardHeader>
 
-        <CardContent>
+      <CardContent>
+        <Link to={`/${repo.owner}/${repo.name}`}>
           {repo.description && (
             <CardDescription className="mb-4 line-clamp-2">
               {repo.description}
@@ -119,26 +127,34 @@ export default function RepositoryList() {
               <span className="text-sm text-[var(--color-text-tertiary)]">{formatSize(repo.size)}</span>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </Link>
+        </Link>
+      </CardContent>
+    </Card>
   );
 
   const RepositoryListItem = ({ repo }: { repo: Repository }) => (
-    <Link to={`/${repo.owner}/${repo.name}`}>
-      <Card hover padding="md" className="mb-3">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-lg font-semibold text-[var(--color-text-primary)] truncate">
-                <span className="text-secondary">{repo.owner}</span>
-                <span className="text-[var(--color-text-tertiary)]"> / </span>
-                <span>{repo.name}</span>
-              </h3>
-              {repo.isPrivate && <Badge variant="warning" size="sm">Private</Badge>}
-              {repo.isArchived && <Badge variant="default" size="sm">Archived</Badge>}
-            </div>
-            
+    <Card hover padding="md" className="mb-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-lg font-semibold text-[var(--color-text-primary)] truncate">
+              <Link 
+                to={`/u/${repo.owner}`} 
+                className="text-secondary hover:underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {repo.owner}
+              </Link>
+              <span className="text-[var(--color-text-tertiary)]"> / </span>
+              <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
+                {repo.name}
+              </Link>
+            </h3>
+            {repo.isPrivate && <Badge variant="warning" size="sm">Private</Badge>}
+            {repo.isArchived && <Badge variant="default" size="sm">Archived</Badge>}
+          </div>
+          
+          <Link to={`/${repo.owner}/${repo.name}`}>
             {repo.description && (
               <p className="text-sm text-[var(--color-text-tertiary)] mb-3 line-clamp-1">
                 {repo.description}
@@ -168,10 +184,10 @@ export default function RepositoryList() {
                 <span>Updated {formatDate(repo.updatedAt)}</span>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
-      </Card>
-    </Link>
+      </div>
+    </Card>
   );
 
   return (

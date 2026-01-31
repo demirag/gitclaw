@@ -7,6 +7,7 @@ import RepositoryList from './pages/RepositoryList';
 import RepositoryDetail from './pages/RepositoryDetail';
 import PullRequestList from './pages/PullRequestList';
 import PullRequestDetail from './pages/PullRequestDetail';
+import Profile from './pages/Profile';
 import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
@@ -40,6 +41,11 @@ function AppContent() {
         
         {/* Repository Routes - Read-only for humans */}
         <Route path="/repositories" element={<RepositoryList />} />
+        
+        {/* Profile Route */}
+        <Route path="/u/:username" element={<Profile />} />
+        
+        {/* Repository Detail Routes */}
         <Route path="/:owner/:repo" element={<RepositoryDetail />} />
         <Route path="/:owner/:repo/pulls" element={<PullRequestList />} />
         <Route path="/:owner/:repo/pull/:number" element={<PullRequestDetail />} />

@@ -292,7 +292,7 @@ export default function RepositoryDetail() {
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                <Link to={`/${owner}`} className="text-secondary hover:underline">
+                <Link to={`/u/${owner}`} className="text-secondary hover:underline">
                   {owner}
                 </Link>
                 <span className="text-[var(--color-text-tertiary)]"> / </span>
@@ -382,66 +382,6 @@ export default function RepositoryDetail() {
       {/* Tab Content */}
       {activeTab === 'code' && (
         <div className="space-y-4">
-          {/* Branch Selector & Last Commit */}
-          <Card padding="md">
-            <div className="flex items-center justify-between">
-              {/* Branch Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                  className="flex items-center gap-2 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded hover:border-[var(--color-border-hover)] transition-colors"
-                >
-                  <GitBranch size={14} className="text-secondary" />
-                  <span className="text-sm font-mono text-[var(--color-text-primary)]">
-                    {currentBranch}
-                  </span>
-                  <ChevronDown size={14} className="text-[var(--color-text-tertiary)]" />
-                </button>
-
-                {showBranchDropdown && branches.length > 0 && (
-                  <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded shadow-lg z-50 max-h-80 overflow-y-auto">
-                    <div className="p-2 border-b border-[var(--color-border)]">
-                      <div className="text-xs font-semibold text-[var(--color-text-tertiary)] uppercase px-2 py-1">
-                        Branches ({branches.length})
-                      </div>
-                    </div>
-                    {branches.map((branch) => (
-                      <button
-                        key={branch}
-                        onClick={() => handleBranchChange(branch)}
-                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--color-bg-secondary)] transition-colors text-left"
-                      >
-                        <span className="text-sm font-mono text-[var(--color-text-primary)]">
-                          {branch}
-                        </span>
-                        {branch === currentBranch && (
-                          <Check size={14} className="text-secondary" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Last Commit Info */}
-              {mockStats.lastCommit && (
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-xs text-[var(--color-text-tertiary)] truncate max-w-md">
-                      {mockStats.lastCommit.message}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-                      {mockStats.lastCommit.author} committed {formatDate(mockStats.lastCommit.date)}
-                    </p>
-                  </div>
-                  <code className="text-xs font-mono text-secondary bg-[var(--color-bg-secondary)] px-2 py-1 rounded">
-                    {mockStats.lastCommit.sha.slice(0, 7)}
-                  </code>
-                </div>
-              )}
-            </div>
-          </Card>
-
           {/* Breadcrumb Navigation */}
           {(currentPath || viewingFile) && (
             <div className="px-3">
@@ -499,9 +439,68 @@ export default function RepositoryDetail() {
             </Card>
           )}
 
-          {/* File Tree */}
+          {/* File Tree with integrated branch selector */}
           {!viewingFile && tree && (
             <Card padding="none">
+              {/* Branch Selector Header */}
+              <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
+                {/* Branch Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                    className="flex items-center gap-2 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded hover:border-[var(--color-border-hover)] transition-colors"
+                  >
+                    <GitBranch size={14} className="text-secondary" />
+                    <span className="text-sm font-mono text-[var(--color-text-primary)]">
+                      {currentBranch}
+                    </span>
+                    <ChevronDown size={14} className="text-[var(--color-text-tertiary)]" />
+                  </button>
+
+                  {showBranchDropdown && branches.length > 0 && (
+                    <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded shadow-lg z-50 max-h-80 overflow-y-auto">
+                      <div className="p-2 border-b border-[var(--color-border)]">
+                        <div className="text-xs font-semibold text-[var(--color-text-tertiary)] uppercase px-2 py-1">
+                          Branches ({branches.length})
+                        </div>
+                      </div>
+                      {branches.map((branch) => (
+                        <button
+                          key={branch}
+                          onClick={() => handleBranchChange(branch)}
+                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--color-bg-secondary)] transition-colors text-left"
+                        >
+                          <span className="text-sm font-mono text-[var(--color-text-primary)]">
+                            {branch}
+                          </span>
+                          {branch === currentBranch && (
+                            <Check size={14} className="text-secondary" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Last Commit Info */}
+                {mockStats.lastCommit && (
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-xs text-[var(--color-text-tertiary)] truncate max-w-md">
+                        {mockStats.lastCommit.message}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                        {mockStats.lastCommit.author} committed {formatDate(mockStats.lastCommit.date)}
+                      </p>
+                    </div>
+                    <code className="text-xs font-mono text-secondary bg-[var(--color-bg-secondary)] px-2 py-1 rounded">
+                      {mockStats.lastCommit.sha.slice(0, 7)}
+                    </code>
+                  </div>
+                )}
+              </div>
+
+              {/* File List */}
               <CardContent className="p-0">
                 {treeLoading ? (
                   <div className="p-8 text-center text-[var(--color-text-tertiary)]">
