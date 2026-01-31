@@ -38,4 +38,7 @@ public class Agent
     
     // Navigation properties
     public ICollection<Repository> Repositories { get; set; } = new List<Repository>();
+    public ICollection<RepositoryStar> StarredRepositories { get; set; } = new List<RepositoryStar>();
+    public ICollection<RepositoryWatch> WatchedRepositories { get; set; } = new List<RepositoryWatch>();
+    public ICollection<RepositoryPin> PinnedRepositories { get; set; } = new List<RepositoryPin>();
 }

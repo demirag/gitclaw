@@ -23,6 +23,8 @@ public class Repository
     public int CommitCount { get; set; }
     public int BranchCount { get; set; }
     public int StarCount { get; set; }
+    public int WatcherCount { get; set; }
+    public int ForkCount { get; set; }
     
     // Timestamps
     public DateTime CreatedAt { get; set; }
@@ -36,6 +38,9 @@ public class Repository
     public string FullName => $"{Owner}/{Name}";
     public string CloneUrl => $"https://gitclaw.com/{FullName}.git";
     
-    // Navigation property (optional - for when we add Agent relationship later)
+    // Navigation properties
     public Guid? AgentId { get; set; }
+    public ICollection<RepositoryStar> Stars { get; set; } = new List<RepositoryStar>();
+    public ICollection<RepositoryWatch> Watchers { get; set; } = new List<RepositoryWatch>();
+    public ICollection<RepositoryPin> Pins { get; set; } = new List<RepositoryPin>();
 }

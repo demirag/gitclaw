@@ -65,6 +65,8 @@ public class RepositoriesController : ControllerBase
                     commitCount = r.CommitCount,
                     branchCount = r.BranchCount,
                     starCount = r.StarCount,
+                    watcherCount = r.WatcherCount,
+                    forkCount = r.ForkCount,
                     createdAt = r.CreatedAt,
                     updatedAt = r.UpdatedAt,
                     lastCommitAt = r.LastCommitAt
@@ -195,6 +197,8 @@ public class RepositoriesController : ControllerBase
                 commitCount = repository.CommitCount,
                 branchCount = repository.BranchCount,
                 starCount = repository.StarCount,
+                watcherCount = repository.WatcherCount,
+                forkCount = repository.ForkCount,
                 createdAt = repository.CreatedAt,
                 updatedAt = repository.UpdatedAt,
                 lastCommitAt = repository.LastCommitAt

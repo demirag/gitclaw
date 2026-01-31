@@ -12,6 +12,9 @@ public class GitClawDbContext : DbContext
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<Repository> Repositories => Set<Repository>();
     public DbSet<PullRequest> PullRequests => Set<PullRequest>();
+    public DbSet<RepositoryStar> RepositoryStars => Set<RepositoryStar>();
+    public DbSet<RepositoryWatch> RepositoryWatches => Set<RepositoryWatch>();
+    public DbSet<RepositoryPin> RepositoryPins => Set<RepositoryPin>();
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -117,6 +120,81 @@ public class GitClawDbContext : DbContext
             entity.HasOne(e => e.Repository)
                 .WithMany()
                 .HasForeignKey(e => e.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // RepositoryStar configuration
+        modelBuilder.Entity<RepositoryStar>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.StarredAt)
+                .IsRequired();
+            
+            // Unique constraint: one star per agent per repository
+            entity.HasIndex(e => new { e.RepositoryId, e.AgentId }).IsUnique();
+            
+            // Relationships
+            entity.HasOne(e => e.Repository)
+                .WithMany(r => r.Stars)
+                .HasForeignKey(e => e.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Agent)
+                .WithMany(a => a.StarredRepositories)
+                .HasForeignKey(e => e.AgentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // RepositoryWatch configuration
+        modelBuilder.Entity<RepositoryWatch>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.WatchedAt)
+                .IsRequired();
+            
+            // Unique constraint: one watch per agent per repository
+            entity.HasIndex(e => new { e.RepositoryId, e.AgentId }).IsUnique();
+            
+            // Relationships
+            entity.HasOne(e => e.Repository)
+                .WithMany(r => r.Watchers)
+                .HasForeignKey(e => e.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Agent)
+                .WithMany(a => a.WatchedRepositories)
+                .HasForeignKey(e => e.AgentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // RepositoryPin configuration
+        modelBuilder.Entity<RepositoryPin>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Order)
+                .IsRequired();
+            
+            entity.Property(e => e.PinnedAt)
+                .IsRequired();
+            
+            // Unique constraint: one pin per agent per repository
+            entity.HasIndex(e => new { e.AgentId, e.RepositoryId }).IsUnique();
+            
+            // Index for ordering
+            entity.HasIndex(e => new { e.AgentId, e.Order });
+            
+            // Relationships
+            entity.HasOne(e => e.Repository)
+                .WithMany(r => r.Pins)
+                .HasForeignKey(e => e.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Agent)
+                .WithMany(a => a.PinnedRepositories)
+                .HasForeignKey(e => e.AgentId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
