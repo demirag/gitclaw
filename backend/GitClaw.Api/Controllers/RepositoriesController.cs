@@ -157,25 +157,7 @@ public class RepositoriesController : ControllerBase
             // Generate repository path
             var repoPath = Path.Combine(RepositoryBasePath, sanitizedOwner, $"{sanitizedName}.git");
             
-            // Ensure the parent directory exists
-            var parentDir = Path.GetDirectoryName(repoPath);
-            if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
-            {
-                try
-                {
-                    Directory.CreateDirectory(parentDir);
-                }
-                catch (Exception dirEx)
-                {
-                    _logger.LogError(dirEx, "Failed to create directory for repository: {Path}", parentDir);
-                    return StatusCode(500, new { 
-                        error = "Failed to create repository directory",
-                        details = "Unable to create storage directory. Please contact support."
-                    });
-                }
-            }
-            
-            // Initialize git repository
+            // Initialize git repository (this will create directories as needed)
             var success = await _gitService.InitializeRepositoryAsync(repoPath);
             
             if (!success)

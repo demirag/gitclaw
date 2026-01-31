@@ -9,146 +9,169 @@ namespace GitClaw.Git;
 /// </summary>
 public class GitService : IGitService
 {
-    public Task<bool> InitializeRepositoryAsync(string path)
+    public async Task<bool> InitializeRepositoryAsync(string path)
     {
         try
         {
-            // Ensure directory exists
-            var directory = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            // Offload synchronous I/O operations to background thread
+            return await Task.Run(() =>
             {
-                Directory.CreateDirectory(directory);
-            }
-            
-            // Initialize bare repository
-            Repository.Init(path, isBare: true);
-            return Task.FromResult(true);
-        }
-        catch (Exception)
-        {
-            return Task.FromResult(false);
-        }
-    }
-    
-    public Task<IEnumerable<CommitInfo>> GetCommitsAsync(string path, int limit = 50)
-    {
-        try
-        {
-            using var repo = new Repository(path);
-            
-            // Check if repository is empty (no HEAD)
-            if (repo.Head == null || repo.Head.Tip == null)
-            {
-                return Task.FromResult(Enumerable.Empty<CommitInfo>());
-            }
-            
-            var commits = repo.Commits
-                .Take(limit)
-                .Select(c => new CommitInfo
+                try
                 {
-                    Sha = c.Sha,
-                    Message = c.MessageShort,
-                    Author = c.Author.Name,
-                    Email = c.Author.Email,
-                    When = c.Author.When.DateTime
-                })
-                .ToList(); // Materialize the list while repo is in scope
-            
-            return Task.FromResult(commits.AsEnumerable());
+                    // Ensure directory exists
+                    var directory = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                    {
+                        Directory.CreateDirectory(directory);
+                    }
+                    
+                    // Initialize bare repository
+                    Repository.Init(path, isBare: true);
+                    return true;
+                }
+                catch
+                {
+                    return false;
+                }
+            });
         }
         catch (Exception)
         {
-            return Task.FromResult(Enumerable.Empty<CommitInfo>());
+            return false;
         }
     }
     
-    public Task<IEnumerable<CommitInfo>> GetCommitsBetweenBranchesAsync(string path, string sourceBranch, string targetBranch)
+    public async Task<IEnumerable<CommitInfo>> GetCommitsAsync(string path, int limit = 50)
     {
         try
         {
-            using var repo = new Repository(path);
-            
-            var sourceBranchRef = repo.Branches[sourceBranch];
-            var targetBranchRef = repo.Branches[targetBranch];
-            
-            if (sourceBranchRef == null || targetBranchRef == null)
+            // Offload LibGit2Sharp operations to background thread
+            return await Task.Run(() =>
             {
-                return Task.FromResult(Enumerable.Empty<CommitInfo>());
-            }
-            
-            // Get commits that are in source but not in target
-            var filter = new CommitFilter
-            {
-                IncludeReachableFrom = sourceBranchRef.Tip,
-                ExcludeReachableFrom = targetBranchRef.Tip
-            };
-            
-            var commits = repo.Commits.QueryBy(filter)
-                .Select(c => new CommitInfo
+                using var repo = new Repository(path);
+                
+                // Check if repository is empty (no HEAD)
+                if (repo.Head == null || repo.Head.Tip == null)
                 {
-                    Sha = c.Sha,
-                    Message = c.MessageShort,
-                    Author = c.Author.Name,
-                    Email = c.Author.Email,
-                    When = c.Author.When.DateTime
-                })
-                .ToList();
-            
-            return Task.FromResult(commits.AsEnumerable());
+                    return Enumerable.Empty<CommitInfo>();
+                }
+                
+                var commits = repo.Commits
+                    .Take(limit)
+                    .Select(c => new CommitInfo
+                    {
+                        Sha = c.Sha,
+                        Message = c.MessageShort,
+                        Author = c.Author.Name,
+                        Email = c.Author.Email,
+                        When = c.Author.When.DateTime
+                    })
+                    .ToList(); // Materialize the list while repo is in scope
+                
+                return commits.AsEnumerable();
+            });
         }
         catch (Exception)
         {
-            return Task.FromResult(Enumerable.Empty<CommitInfo>());
+            return Enumerable.Empty<CommitInfo>();
         }
     }
     
-    public Task<DiffResult> GetDiffBetweenBranchesAsync(string path, string sourceBranch, string targetBranch)
+    public async Task<IEnumerable<CommitInfo>> GetCommitsBetweenBranchesAsync(string path, string sourceBranch, string targetBranch)
+    {
+        try
+        {
+            // Offload LibGit2Sharp operations to background thread
+            return await Task.Run(() =>
+            {
+                using var repo = new Repository(path);
+                
+                var sourceBranchRef = repo.Branches[sourceBranch];
+                var targetBranchRef = repo.Branches[targetBranch];
+                
+                if (sourceBranchRef == null || targetBranchRef == null)
+                {
+                    return Enumerable.Empty<CommitInfo>();
+                }
+                
+                // Get commits that are in source but not in target
+                var filter = new CommitFilter
+                {
+                    IncludeReachableFrom = sourceBranchRef.Tip,
+                    ExcludeReachableFrom = targetBranchRef.Tip
+                };
+                
+                var commits = repo.Commits.QueryBy(filter)
+                    .Select(c => new CommitInfo
+                    {
+                        Sha = c.Sha,
+                        Message = c.MessageShort,
+                        Author = c.Author.Name,
+                        Email = c.Author.Email,
+                        When = c.Author.When.DateTime
+                    })
+                    .ToList();
+                
+                return commits.AsEnumerable();
+            });
+        }
+        catch (Exception)
+        {
+            return Enumerable.Empty<CommitInfo>();
+        }
+    }
+    
+    public async Task<DiffResult> GetDiffBetweenBranchesAsync(string path, string sourceBranch, string targetBranch)
     {
         var result = new DiffResult();
         
         try
         {
-            using var repo = new Repository(path);
-            
-            var sourceBranchRef = repo.Branches[sourceBranch];
-            var targetBranchRef = repo.Branches[targetBranch];
-            
-            if (sourceBranchRef == null || targetBranchRef == null)
+            // Offload LibGit2Sharp operations to background thread
+            return await Task.Run(() =>
             {
-                return Task.FromResult(result);
-            }
-            
-            var sourceTree = sourceBranchRef.Tip.Tree;
-            var targetTree = targetBranchRef.Tip.Tree;
-            
-            // Compare target (base) to source (head) - what changes would be applied
-            var diff = repo.Diff.Compare<Patch>(targetTree, sourceTree);
-            
-            foreach (var entry in diff)
-            {
-                var fileChange = new FileChangeInfo
-                {
-                    Path = entry.Path,
-                    OldPath = entry.OldPath != entry.Path ? entry.OldPath : null,
-                    Status = MapChangeKind(entry.Status),
-                    Additions = entry.LinesAdded,
-                    Deletions = entry.LinesDeleted,
-                    Patch = entry.Patch,
-                    Hunks = ParseHunks(entry.Patch)
-                };
+                using var repo = new Repository(path);
                 
-                result.Files.Add(fileChange);
-                result.TotalAdditions += entry.LinesAdded;
-                result.TotalDeletions += entry.LinesDeleted;
-            }
-            
-            result.TotalFilesChanged = result.Files.Count;
-            
-            return Task.FromResult(result);
+                var sourceBranchRef = repo.Branches[sourceBranch];
+                var targetBranchRef = repo.Branches[targetBranch];
+                
+                if (sourceBranchRef == null || targetBranchRef == null)
+                {
+                    return result;
+                }
+                
+                var sourceTree = sourceBranchRef.Tip.Tree;
+                var targetTree = targetBranchRef.Tip.Tree;
+                
+                // Compare target (base) to source (head) - what changes would be applied
+                var diff = repo.Diff.Compare<Patch>(targetTree, sourceTree);
+                
+                foreach (var entry in diff)
+                {
+                    var fileChange = new FileChangeInfo
+                    {
+                        Path = entry.Path,
+                        OldPath = entry.OldPath != entry.Path ? entry.OldPath : null,
+                        Status = MapChangeKind(entry.Status),
+                        Additions = entry.LinesAdded,
+                        Deletions = entry.LinesDeleted,
+                        Patch = entry.Patch,
+                        Hunks = ParseHunks(entry.Patch)
+                    };
+                    
+                    result.Files.Add(fileChange);
+                    result.TotalAdditions += entry.LinesAdded;
+                    result.TotalDeletions += entry.LinesDeleted;
+                }
+                
+                result.TotalFilesChanged = result.Files.Count;
+                
+                return result;
+            });
         }
         catch (Exception)
         {
-            return Task.FromResult(result);
+            return result;
         }
     }
     
@@ -247,72 +270,81 @@ public class GitService : IGitService
         return null;
     }
     
-    public Task<IEnumerable<string>> GetBranchesAsync(string path)
+    public async Task<IEnumerable<string>> GetBranchesAsync(string path)
     {
         try
         {
-            using var repo = new Repository(path);
-            
-            // Return empty list if no branches exist
-            if (!repo.Branches.Any())
+            // Offload LibGit2Sharp operations to background thread
+            return await Task.Run(() =>
             {
-                return Task.FromResult(Enumerable.Empty<string>());
-            }
-            
-            var branches = repo.Branches.Select(b => b.FriendlyName).ToList();
-            return Task.FromResult(branches.AsEnumerable());
+                using var repo = new Repository(path);
+                
+                // Return empty list if no branches exist
+                if (!repo.Branches.Any())
+                {
+                    return Enumerable.Empty<string>();
+                }
+                
+                var branches = repo.Branches.Select(b => b.FriendlyName).ToList();
+                return branches.AsEnumerable();
+            });
         }
         catch (Exception)
         {
-            return Task.FromResult(Enumerable.Empty<string>());
+            return Enumerable.Empty<string>();
         }
     }
     
-    public Task<RepositoryStats> GetRepositoryStatsAsync(string path)
+    public async Task<RepositoryStats> GetRepositoryStatsAsync(string path)
     {
         try
         {
-            using var repo = new Repository(path);
-            
-            // Initialize stats with safe defaults
-            var stats = new RepositoryStats
+            // Offload LibGit2Sharp operations to background thread
+            return await Task.Run(() =>
             {
-                CommitCount = 0,
-                BranchCount = repo.Branches.Count(),
-                Size = CalculateRepositorySize(path),
-                LastCommit = null
-            };
-            
-            // Only count commits if repository has HEAD
-            if (repo.Head != null && repo.Head.Tip != null)
-            {
-                stats.CommitCount = repo.Commits.Count();
-                stats.LastCommit = repo.Commits.FirstOrDefault()?.Author.When.DateTime;
-            }
-            
-            return Task.FromResult(stats);
+                using var repo = new Repository(path);
+                
+                // Initialize stats with safe defaults
+                var stats = new RepositoryStats
+                {
+                    CommitCount = 0,
+                    BranchCount = repo.Branches.Count(),
+                    Size = CalculateRepositorySize(path),
+                    LastCommit = null
+                };
+                
+                // Only count commits if repository has HEAD
+                if (repo.Head != null && repo.Head.Tip != null)
+                {
+                    stats.CommitCount = repo.Commits.Count();
+                    stats.LastCommit = repo.Commits.FirstOrDefault()?.Author.When.DateTime;
+                }
+                
+                return stats;
+            });
         }
         catch (Exception)
         {
-            return Task.FromResult(new RepositoryStats
+            return new RepositoryStats
             {
                 CommitCount = 0,
                 BranchCount = 0,
                 Size = CalculateRepositorySize(path),
                 LastCommit = null
-            });
+            };
         }
     }
     
-    public Task<bool> RepositoryExistsAsync(string path)
+    public async Task<bool> RepositoryExistsAsync(string path)
     {
         try
         {
-            return Task.FromResult(Repository.IsValid(path));
+            // Offload synchronous I/O to background thread
+            return await Task.Run(() => Repository.IsValid(path));
         }
         catch (Exception)
         {
-            return Task.FromResult(false);
+            return false;
         }
     }
     
