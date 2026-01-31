@@ -23,6 +23,8 @@ export default function PullRequestList() {
       return response.data.pullRequests;
     },
     enabled: !!owner && !!repo,
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    staleTime: 30000, // Consider data stale after 30 seconds
   });
 
   const filteredPRs = pullRequests.filter((pr) => {

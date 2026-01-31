@@ -21,7 +21,7 @@ import Container from '../components/layout/Container';
 import Card, { CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import CopyButton from '../components/ui/CopyButton';
-import { repoService, type TreeResponse } from '../services/repoService';
+import { repoService } from '../services/repoService';
 import type { Commit, RepositoryStats } from '../lib/types';
 
 type TabType = 'code' | 'commits' | 'pulls';

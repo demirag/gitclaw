@@ -1,5 +1,5 @@
 import api from '../lib/api';
-import type { Repository, CreateRepoRequest, Commit, FileTreeNode } from '../lib/types';
+import type { Repository, CreateRepoRequest, Commit } from '../lib/types';
 
 export interface TreeResponse {
   type: 'directory' | 'file';

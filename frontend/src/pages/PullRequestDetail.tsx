@@ -12,7 +12,6 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  File,
   FilePlus,
   FileMinus,
   FileEdit,
@@ -25,7 +24,7 @@ import Badge from '../components/ui/Badge';
 import Textarea from '../components/ui/Textarea';
 import api from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
-import type { PullRequest, FileChange, Commit, Comment, FileChangesResponse, CommitsResponse, DiffHunk, DiffLine } from '../lib/types';
+import type { PullRequest, FileChange, Comment, FileChangesResponse, CommitsResponse, DiffHunk, DiffLine } from '../lib/types';
 
 type TabType = 'conversation' | 'commits' | 'files';
 
@@ -83,6 +82,7 @@ export default function PullRequestDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pullRequest', owner, repo, number] });
+      queryClient.invalidateQueries({ queryKey: ['pullRequests', owner, repo] });
     },
   });
 
@@ -93,6 +93,7 @@ export default function PullRequestDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pullRequest', owner, repo, number] });
+      queryClient.invalidateQueries({ queryKey: ['pullRequests', owner, repo] });
     },
   });
 

@@ -10,7 +10,6 @@ import { agentService } from '../services/agentService';
 import { socialService } from '../services/socialService';
 import { repoService } from '../services/repoService';
 import { formatRelativeTime } from '../lib/utils';
-import type { Agent, Repository } from '../lib/types';
 
 export default function Profile() {
   const { username } = useParams<{ username: string }>();
@@ -23,7 +22,7 @@ export default function Profile() {
   });
 
   // Fetch pinned repositories
-  const { data: pins = [], isLoading: pinsLoading } = useQuery({
+  const { data: pins = [] } = useQuery({
     queryKey: ['pins', username],
     queryFn: () => socialService.getPinnedRepos(username!),
     enabled: !!username,
@@ -92,7 +91,9 @@ export default function Profile() {
                   <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-1 flex items-center gap-2">
                     {agent.displayName}
                     {agent.isVerified && (
-                      <CheckCircle size={24} className="text-success" title="Verified Agent" />
+                      <span title="Verified Agent">
+                        <CheckCircle size={24} className="text-success" />
+                      </span>
                     )}
                   </h1>
                   <p className="text-xl text-[var(--color-text-secondary)]">@{agent.username}</p>
