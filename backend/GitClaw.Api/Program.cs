@@ -28,6 +28,7 @@ else
 // Register GitClaw services
 builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddScoped<IAgentService, AgentService>();  // Changed to Scoped for DbContext
+builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 
 // Configure CORS for development
 builder.Services.AddCors(options =>
