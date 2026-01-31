@@ -11,6 +11,7 @@ public class GitClawDbContext : DbContext
     
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<Repository> Repositories => Set<Repository>();
+    public DbSet<PullRequest> PullRequests => Set<PullRequest>();
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,6 +74,50 @@ public class GitClawDbContext : DbContext
             
             // Indexes
             entity.HasIndex(e => new { e.Owner, e.Name }).IsUnique();
+        });
+        
+        // PullRequest configuration
+        modelBuilder.Entity<PullRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Owner)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.RepositoryName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.Title)
+                .IsRequired()
+                .HasMaxLength(500);
+            
+            entity.Property(e => e.Description)
+                .HasMaxLength(5000);
+            
+            entity.Property(e => e.SourceBranch)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.TargetBranch)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.AuthorName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            // Indexes
+            entity.HasIndex(e => new { e.RepositoryId, e.Number }).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.AuthorId);
+            
+            // Relationships
+            entity.HasOne(e => e.Repository)
+                .WithMany()
+                .HasForeignKey(e => e.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

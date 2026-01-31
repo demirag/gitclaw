@@ -29,6 +29,7 @@ else
 builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddScoped<IAgentService, AgentService>();  // Changed to Scoped for DbContext
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
+builder.Services.AddScoped<IPullRequestService, PullRequestService>();
 
 // Configure CORS for development
 builder.Services.AddCors(options =>
