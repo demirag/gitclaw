@@ -31,10 +31,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const { isAuthenticated, agent, logout } = useAuth();
 
-  // Initialize theme from localStorage
+  // Initialize theme - DARK MODE IS DEFAULT!
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    // Dark mode is default, only remove if user explicitly chose light mode
+    if (savedTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
       document.documentElement.classList.add('dark');
     }
   }, []);

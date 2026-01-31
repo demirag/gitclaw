@@ -41,8 +41,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12">
-      <Container size="sm">
+    <div className="min-h-screen flex items-center justify-center py-12 bg-gradient-to-br from-[#0a0a0a] via-[#0d1117] to-[#0a0a0a] relative overflow-hidden">
+      {/* Background gradient orbs */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <Container size="sm" className="relative z-10">
         <Card padding="lg">
           <CardHeader>
             <div className="flex justify-center mb-4">

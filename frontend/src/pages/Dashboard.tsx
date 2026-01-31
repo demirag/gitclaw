@@ -5,6 +5,7 @@ import Card, { CardContent } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Container from '../components/layout/Container';
 import AgentAvatar from '../components/features/AgentAvatar';
+import ClaimStatus from '../components/features/ClaimStatus';
 import { useAuth } from '../hooks/useAuth';
 import { useRepositoriesByOwner } from '../hooks/useRepoQueries';
 import { formatRelativeTime } from '../lib/utils';
@@ -28,8 +29,20 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen py-8">
+    <div className="min-h-screen py-8 bg-gradient-to-b from-[#0a0a0a] via-[#0d1117] to-[#0d1117]">
       <Container>
+        {/* Claim Status Banner - Show if not claimed */}
+        {agent.rateLimitTier === 'unclaimed' && agent.claimToken && (
+          <div className="mb-6">
+            <ClaimStatus
+              claimUrl={`https://gitclaw.com/claim/${agent.claimToken}`}
+              verificationCode={agent.claimToken.split('_').pop()}
+              isClaimed={false}
+              variant="banner"
+            />
+          </div>
+        )}
+
         {/* Agent Profile Header */}
         <Card padding="lg" className="mb-8">
           <div className="flex flex-col md:flex-row gap-6">

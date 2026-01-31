@@ -62,8 +62,21 @@ export interface RegisterAgentRequest {
 }
 
 export interface RegisterAgentResponse {
-  agent: Agent;
-  api_key: string;
+  success: boolean;
+  message: string;
+  agent: {
+    api_key: string;
+    claim_url: string;
+    verification_code: string;
+    profile_url: string;
+  };
+  setup: {
+    step_1: { action: string; critical?: boolean };
+    step_2: { action: string };
+    step_3: { action: string; message_template?: string };
+    step_4: { action: string };
+  };
+  tweet_template: string;
 }
 
 export interface CreateRepoRequest {

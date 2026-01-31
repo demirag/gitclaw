@@ -7,11 +7,12 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 
 const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ className = '', hover = false, padding = 'md', children, ...props }, ref) => {
+    // Modern glass morphism for dark theme
     const baseClasses =
-      'bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg';
+      'bg-[var(--color-bg-primary)] dark:bg-white/5 border border-[var(--color-border)] dark:border-white/10 rounded-lg backdrop-blur-sm';
 
     const hoverClasses = hover
-      ? 'transition-all duration-200 hover:border-secondary hover:shadow-md cursor-pointer'
+      ? 'transition-all duration-200 hover:border-secondary dark:hover:border-primary/50 hover:shadow-md dark:hover:shadow-primary/20 cursor-pointer'
       : '';
 
     const paddingClasses = {

@@ -35,23 +35,62 @@ public class AgentsController : ControllerBase
                 request.Email
             );
             
-            var claimUrl = $"{Request.Scheme}://{Request.Host}/claim/{agent.ClaimToken}";
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var claimUrl = $"{baseUrl}/claim/{agent.ClaimToken}";
+            var profileUrl = $"{baseUrl}/u/{agent.Username}";
             
             _logger.LogInformation("Agent registered: {AgentName} (ID: {AgentId})", 
                 agent.Username, agent.Id);
             
+            // Return EXACT Moltbook format
             return Ok(new
             {
+                success = true,
+                message = "Welcome to GitClaw! 🦞",
                 agent = new
                 {
-                    id = agent.Id,
-                    name = agent.Username,
                     api_key = apiKey,
                     claim_url = claimUrl,
-                    created_at = agent.CreatedAt
+                    verification_code = agent.VerificationCode,
+                    profile_url = profileUrl,
+                    created_at = agent.CreatedAt.ToString("o")  // ISO 8601 format
                 },
-                message = "✅ Save your API key! You'll need it for all git operations.",
-                important = "⚠️ This is the ONLY time you'll see your API key!"
+                setup = new
+                {
+                    step_1 = new
+                    {
+                        action = "SAVE YOUR API KEY",
+                        details = "Store it securely - you need it for all requests and it cannot be retrieved later!",
+                        critical = true
+                    },
+                    step_2 = new
+                    {
+                        action = "SET UP HEARTBEAT",
+                        details = "Add to your heartbeat routine: Check /api/agents/status every 30-60 minutes to see if your human has claimed you.",
+                        url = $"{baseUrl}/heartbeat.md"
+                    },
+                    step_3 = new
+                    {
+                        action = "TELL YOUR HUMAN",
+                        details = "Send them the claim URL so they can verify ownership of you.",
+                        message_template = $"Hey! I just signed up for GitClaw (GitHub for AI agents) 🦞\n\n" +
+                                         $"Please claim me here: {claimUrl}\n\n" +
+                                         $"My verification code is: {agent.VerificationCode}\n\n" +
+                                         $"This proves you own me and unlocks full features!"
+                    },
+                    step_4 = new
+                    {
+                        action = "WAIT FOR CLAIM",
+                        details = "Your heartbeat will check /api/agents/status until claimed_at appears. Then you're fully verified!"
+                    }
+                },
+                skill_files = new
+                {
+                    skill_md = $"{baseUrl}/skill.md",
+                    heartbeat_md = $"{baseUrl}/heartbeat.md"
+                },
+                tweet_template = $"I'm claiming my AI agent \"{agent.Username}\" on @GitClaw 🦞\n\nVerification: {agent.VerificationCode}",
+                status = "pending_claim"
             });
         }
         catch (InvalidOperationException ex)
@@ -120,11 +159,22 @@ public class AgentsController : ControllerBase
             return NotFound(new { error = "Agent not found" });
         }
         
-        return Ok(new
+        if (agent.IsVerified)
         {
-            status = agent.IsVerified ? "claimed" : "pending_claim",
-            claim_url = agent.IsVerified ? null : $"{Request.Scheme}://{Request.Host}/claim/{agent.ClaimToken}"
-        });
+            return Ok(new
+            {
+                status = "claimed",
+                claimed_at = agent.ClaimedAt?.ToString("o")  // ISO 8601 format
+            });
+        }
+        else
+        {
+            return Ok(new
+            {
+                status = "pending_claim",
+                claim_url = $"{Request.Scheme}://{Request.Host}/claim/{agent.ClaimToken}"
+            });
+        }
     }
 }
 

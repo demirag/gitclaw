@@ -35,6 +35,9 @@ public class AgentService : IAgentService
         // Generate claim token
         var claimToken = GenerateClaimToken();
         
+        // Generate verification code
+        var verificationCode = GenerateVerificationCode();
+        
         // Create agent
         var agent = new Agent
         {
@@ -45,6 +48,7 @@ public class AgentService : IAgentService
             Bio = description ?? string.Empty,
             ApiKeyHash = apiKeyHash,
             ClaimToken = claimToken,
+            VerificationCode = verificationCode,
             RateLimitTier = "unclaimed",
             IsActive = true,
             IsVerified = false,
@@ -162,5 +166,23 @@ public class AgentService : IAgentService
             .Replace("=", "");
         
         return $"gitclaw_claim_{token}";
+    }
+    
+    /// <summary>
+    /// Generate a verification code in format: "color-CODE" (e.g., "blue-AALQ")
+    /// </summary>
+    private static string GenerateVerificationCode()
+    {
+        var colors = new[] { "red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan" };
+        var random = new Random();
+        var color = colors[random.Next(colors.Length)];
+        
+        // Generate 4 random uppercase letters
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var code = new string(Enumerable.Range(0, 4)
+            .Select(_ => chars[random.Next(chars.Length)])
+            .ToArray());
+        
+        return $"{color}-{code}";
     }
 }

@@ -1,27 +1,50 @@
 @import "tailwindcss";
 
-/* Light mode variables */
+/* 
+ * DARK MODE IS DEFAULT!
+ * Light mode is the exception, not the rule.
+ * Per COLOR-PALETTE.md: "Dark Mode First"
+ */
+
+/* Dark mode variables (DEFAULT) */
 :root {
   /* Text Colors */
+  --color-text-primary: #f0f6fc;
+  --color-text-secondary: #c9d1d9;
+  --color-text-tertiary: #8b949e;
+  --color-text-muted: #6e7681;
+
+  /* Background Colors */
+  --color-bg-primary: #0d1117;
+  --color-bg-secondary: #161b22;
+
+  /* Border Colors */
+  --color-border: #3f444d;
+  --color-border-light: #30363d;
+
+  /* Code */
+  --color-code-bg: #161b22;
+  --color-code-border: #30363d;
+}
+
+/* Light mode variables (OPTIONAL) */
+.light {
   --color-text-primary: #0d1117;
   --color-text-secondary: #24292f;
   --color-text-tertiary: #57606a;
   --color-text-muted: #8b949e;
 
-  /* Background Colors */
   --color-bg-primary: #ffffff;
   --color-bg-secondary: #f6f8fa;
 
-  /* Border Colors */
   --color-border: #d0d7de;
   --color-border-light: #e5e9ed;
 
-  /* Code */
   --color-code-bg: #f6f8fa;
   --color-code-border: #d0d7de;
 }
 
-/* Dark mode variables */
+/* Keep .dark class for backwards compatibility */
 .dark {
   --color-text-primary: #f0f6fc;
   --color-text-secondary: #c9d1d9;

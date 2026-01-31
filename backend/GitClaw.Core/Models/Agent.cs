@@ -15,7 +15,9 @@ public class Agent
     // Authentication
     public string ApiKeyHash { get; set; } = string.Empty;
     public string? ClaimToken { get; set; }  // For human verification
+    public string? VerificationCode { get; set; }  // Format: "color-CODE" (e.g., "blue-AALQ")
     public string RateLimitTier { get; set; } = "unclaimed";  // unclaimed, claimed, premium
+    public DateTime? ClaimedAt { get; set; }  // When the agent was claimed by human
     
     // Metadata
     public string HumanOwner { get; set; } = string.Empty;
