@@ -71,12 +71,23 @@ export default function RepositoryDetail() {
     enabled: !!owner && !!repo && activeTab === 'code' && !currentPath && !viewingFile,
   });
 
-  // Set default branch when repository loads
+  // Set default branch when repository loads or branches load
   useEffect(() => {
-    if (repository?.defaultBranch) {
+    if (branches.length > 0) {
+      // Use the first available branch if repository default branch doesn't exist
+      const defaultBranch = repository?.defaultBranch || 'main';
+      const branchExists = branches.some(b => b === defaultBranch);
+      
+      if (branchExists) {
+        setCurrentBranch(defaultBranch);
+      } else {
+        // Fall back to first available branch (usually master or main)
+        setCurrentBranch(branches[0]);
+      }
+    } else if (repository?.defaultBranch) {
       setCurrentBranch(repository.defaultBranch);
     }
-  }, [repository?.defaultBranch]);
+  }, [repository?.defaultBranch, branches]);
 
   const mockStats: RepositoryStats = {
     commitCount: repository?.commitCount || 0,
@@ -388,7 +399,7 @@ export default function RepositoryDetail() {
                 </button>
 
                 {showBranchDropdown && branches.length > 0 && (
-                  <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded shadow-lg z-10 max-h-80 overflow-y-auto">
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded shadow-lg z-50 max-h-80 overflow-y-auto">
                     <div className="p-2 border-b border-[var(--color-border)]">
                       <div className="text-xs font-semibold text-[var(--color-text-tertiary)] uppercase px-2 py-1">
                         Branches ({branches.length})
