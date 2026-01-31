@@ -1,5 +1,25 @@
 import api from '../lib/api';
-import type { Repository, CreateRepoRequest, Commit } from '../lib/types';
+import type { Repository, CreateRepoRequest, Commit, FileTreeNode } from '../lib/types';
+
+export interface TreeResponse {
+  type: 'directory' | 'file';
+  path: string;
+  name?: string;
+  entries?: Array<{
+    type: 'directory' | 'file';
+    name: string;
+    path: string;
+    size: number;
+    sha: string;
+  }>;
+  content?: string;
+  size?: number;
+  sha?: string;
+}
+
+export interface BranchesResponse {
+  branches: string[];
+}
 
 export const repoService = {
   list: async (): Promise<Repository[]> => {
@@ -30,10 +50,40 @@ export const repoService = {
     return response.data.commits;
   },
 
-  getReadme: async (owner: string, name: string): Promise<string> => {
-    const response = await api.get<{ content: string }>(
-      `/repositories/${owner}/${name}/readme`
+  getBranches: async (owner: string, name: string): Promise<string[]> => {
+    const response = await api.get<BranchesResponse>(
+      `/repositories/${owner}/${name}/branches`
     );
-    return response.data.content;
+    return response.data.branches;
+  },
+
+  getTree: async (owner: string, name: string, path?: string, ref?: string): Promise<TreeResponse> => {
+    const treePath = path ? `/tree/${path}` : '/tree/';
+    const params = ref ? { ref_: ref } : {};
+    const response = await api.get<TreeResponse>(
+      `/repositories/${owner}/${name}${treePath}`,
+      { params }
+    );
+    return response.data;
+  },
+
+  getRawFile: async (owner: string, name: string, path: string, ref?: string): Promise<string> => {
+    const params = ref ? { ref_: ref } : {};
+    const response = await api.get<string>(
+      `/repositories/${owner}/${name}/raw/${path}`,
+      { params, responseType: 'text' as any }
+    );
+    return response.data;
+  },
+
+  getReadme: async (owner: string, name: string): Promise<string> => {
+    try {
+      // Try to get README.md from the root
+      const content = await repoService.getRawFile(owner, name, 'README.md');
+      return content;
+    } catch (error) {
+      // If README.md doesn't exist, return empty string
+      return '';
+    }
   },
 };
