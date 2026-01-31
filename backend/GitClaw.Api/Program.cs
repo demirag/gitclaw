@@ -1,5 +1,7 @@
 using GitClaw.Core.Interfaces;
 using GitClaw.Git;
+using GitClaw.Data;
+using GitClaw.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +12,7 @@ builder.Services.AddSwaggerGen();
 
 // Register GitClaw services
 builder.Services.AddSingleton<IGitService, GitService>();
+builder.Services.AddSingleton<IAgentService, AgentService>();
 
 // Configure CORS for development
 builder.Services.AddCors(options =>
@@ -32,6 +35,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+
+// Use authentication middleware (must be before MapControllers)
+app.UseAgentAuthentication();
+
 app.MapControllers();
 
 app.MapGet("/", () => new
@@ -43,6 +50,7 @@ app.MapGet("/", () => new
     {
         docs = "/swagger",
         health = "/health",
+        agents = "/api/agents",
         repos = "/api/repositories"
     }
 });

@@ -14,6 +14,8 @@ public class Agent
     
     // Authentication
     public string ApiKeyHash { get; set; } = string.Empty;
+    public string? ClaimToken { get; set; }  // For human verification
+    public string RateLimitTier { get; set; } = "unclaimed";  // unclaimed, claimed, premium
     
     // Metadata
     public string HumanOwner { get; set; } = string.Empty;

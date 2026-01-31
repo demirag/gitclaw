@@ -26,6 +26,16 @@ public class GitProtocolController : ControllerBase
     [HttpGet("info/refs")]
     public async Task GetInfoRefs(string owner, string repo, [FromQuery] string service)
     {
+        // Check authentication
+        var agentId = HttpContext.Items["AgentId"] as Guid?;
+        if (agentId == null)
+        {
+            Response.StatusCode = 401;
+            Response.Headers.WWWAuthenticate = "Basic realm=\"GitClaw\"";
+            await Response.WriteAsync("Authentication required");
+            return;
+        }
+        
         var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
         
         if (!Directory.Exists(repoPath))
@@ -112,6 +122,15 @@ public class GitProtocolController : ControllerBase
     [HttpPost("git-upload-pack")]
     public async Task PostUploadPack(string owner, string repo)
     {
+        // Check authentication
+        var agentId = HttpContext.Items["AgentId"] as Guid?;
+        if (agentId == null)
+        {
+            Response.StatusCode = 401;
+            await Response.WriteAsync("Authentication required");
+            return;
+        }
+        
         var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
         
         if (!Directory.Exists(repoPath))
@@ -184,6 +203,15 @@ public class GitProtocolController : ControllerBase
     [HttpPost("git-receive-pack")]
     public async Task PostReceivePack(string owner, string repo)
     {
+        // Check authentication
+        var agentId = HttpContext.Items["AgentId"] as Guid?;
+        if (agentId == null)
+        {
+            Response.StatusCode = 401;
+            await Response.WriteAsync("Authentication required");
+            return;
+        }
+        
         var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
         
         if (!Directory.Exists(repoPath))
