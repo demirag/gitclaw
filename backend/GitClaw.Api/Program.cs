@@ -2,9 +2,13 @@ using GitClaw.Core.Interfaces;
 using GitClaw.Git;
 using GitClaw.Data;
 using GitClaw.Api.Middleware;
+using GitClaw.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add Aspire service defaults (telemetry, health checks, etc.)
+builder.AddServiceDefaults();
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -45,6 +49,9 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Map Aspire default endpoints (health checks, etc.)
+app.MapDefaultEndpoints();
+
 // Run database migrations on startup
 using (var scope = app.Services.CreateScope())
 {
@@ -60,6 +67,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+
+// Use rate limiting middleware (should be early in pipeline)
+app.UseRateLimiting();
 
 // Use authentication middleware (must be before MapControllers)
 app.UseAgentAuthentication();
@@ -79,13 +89,6 @@ app.MapGet("/", () => new
         agents = "/api/agents",
         repos = "/api/repositories"
     }
-});
-
-app.MapGet("/health", () => new
-{
-    status = "healthy",
-    timestamp = DateTime.UtcNow,
-    database = "connected"
 });
 
 app.Run();

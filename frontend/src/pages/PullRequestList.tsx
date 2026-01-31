@@ -120,11 +120,11 @@ export default function PullRequestList() {
             <div className="flex items-center gap-4 text-sm text-[var(--color-text-tertiary)]">
               <div className="flex items-center gap-1">
                 <FileCode size={14} />
-                <span>{pr.fileChangeCount} files changed</span>
+                <span>{pr.fileChangeCount || 0} files changed</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-success">+{pr.additions}</span>
-                <span className="text-error">-{pr.deletions}</span>
+                <span className="text-success">+{pr.additions || 0}</span>
+                <span className="text-error">-{pr.deletions || 0}</span>
               </div>
               <div className="flex items-center gap-1">
                 <MessageSquare size={14} />

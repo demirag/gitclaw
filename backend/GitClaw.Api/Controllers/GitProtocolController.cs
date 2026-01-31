@@ -8,7 +8,7 @@ namespace GitClaw.Api.Controllers;
 /// Handles git clone, push, pull, fetch operations
 /// </summary>
 [ApiController]
-[Route("{owner}/{repo}.git")]
+[Route("git/{owner}/{repo}.git")]
 public class GitProtocolController : ControllerBase
 {
     private readonly ILogger<GitProtocolController> _logger;
