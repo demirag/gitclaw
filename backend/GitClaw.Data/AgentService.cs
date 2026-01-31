@@ -9,9 +9,6 @@ namespace GitClaw.Data;
 public class AgentService : IAgentService
 {
     private readonly GitClawDbContext _dbContext;
-    private static readonly Dictionary<string, (Guid AgentId, DateTime CachedAt)> _apiKeyCache = new();
-    private static readonly object _cacheLock = new object();
-    private const int CacheExpirationMinutes = 15;
     
     public AgentService(GitClawDbContext dbContext)
     {
@@ -35,8 +32,11 @@ public class AgentService : IAgentService
         // Generate API key
         var apiKey = GenerateApiKey();
         
-        // Hash API key
+        // Hash API key for secure storage (BCrypt - slow but secure)
         var apiKeyHash = BCrypt.Net.BCrypt.HashPassword(apiKey, BCrypt.Net.BCrypt.GenerateSalt(12));
+        
+        // Create lookup hash for fast indexed database queries (SHA256)
+        var apiKeyLookupHash = HashApiKeyForLookup(apiKey);
         
         // Generate claim token
         var claimToken = GenerateClaimToken();
@@ -53,6 +53,7 @@ public class AgentService : IAgentService
             Email = email ?? string.Empty,
             Bio = description ?? string.Empty,
             ApiKeyHash = apiKeyHash,
+            ApiKeyLookupHash = apiKeyLookupHash,
             ClaimToken = claimToken,
             VerificationCode = verificationCode,
             RateLimitTier = "unclaimed",
@@ -71,7 +72,7 @@ public class AgentService : IAgentService
     }
     
     /// <summary>
-    /// Validate API key and return agent (with caching)
+    /// Validate API key and return agent (using indexed lookup + BCrypt verification)
     /// </summary>
     public async Task<Agent?> ValidateApiKeyAsync(string apiKey)
     {
@@ -80,73 +81,48 @@ public class AgentService : IAgentService
             return null;
         }
         
-        // Check cache first (massive performance improvement)
-        Guid? cachedAgentId = null;
-        lock (_cacheLock)
-        {
-            if (_apiKeyCache.TryGetValue(apiKey, out var cached))
-            {
-                // Check if cache entry is still valid
-                if ((DateTime.UtcNow - cached.CachedAt).TotalMinutes < CacheExpirationMinutes)
-                {
-                    cachedAgentId = cached.AgentId;
-                }
-                else
-                {
-                    // Cache expired, remove
-                    _apiKeyCache.Remove(apiKey);
-                }
-            }
-        }
+        // Generate lookup hash for indexed database query (fast)
+        var lookupHash = HashApiKeyForLookup(apiKey);
         
-        // If we found a cached ID, load the agent (outside the lock)
-        if (cachedAgentId.HasValue)
-        {
-            var cachedAgent = await _dbContext.Agents
-                .AsNoTracking()
-                .FirstOrDefaultAsync(a => a.Id == cachedAgentId.Value);
-            
-            if (cachedAgent != null)
-            {
-                return cachedAgent;
-            }
-            
-            // Agent was deleted, remove from cache
-            lock (_cacheLock)
-            {
-                _apiKeyCache.Remove(apiKey);
-            }
-        }
-        
-        // Cache miss - need to verify API key (slow)
-        // Get all agents (unfortunately BCrypt requires in-memory verification)
-        var agents = await _dbContext.Agents
+        // Query database using indexed lookup hash (milliseconds, not seconds!)
+        var agent = await _dbContext.Agents
             .AsNoTracking()
-            .ToListAsync();
+            .FirstOrDefaultAsync(a => a.ApiKeyLookupHash == lookupHash)
+            .ConfigureAwait(false);
         
-        foreach (var agent in agents)
+        if (agent == null)
         {
-            try
-            {
-                if (BCrypt.Net.BCrypt.Verify(apiKey, agent.ApiKeyHash))
-                {
-                    // Add to cache for future requests
-                    lock (_cacheLock)
-                    {
-                        _apiKeyCache[apiKey] = (agent.Id, DateTime.UtcNow);
-                    }
-                    
-                    return agent;
-                }
-            }
-            catch
-            {
-                // Invalid hash format, skip
-                continue;
-            }
+            return null;
         }
         
+        // Verify BCrypt hash to ensure API key is correct (not just lookup hash collision)
+        // This is still slow (~1s) but only happens once per lookup hit
+        try
+        {
+            if (BCrypt.Net.BCrypt.Verify(apiKey, agent.ApiKeyHash))
+            {
+                return agent;
+            }
+        }
+        catch
+        {
+            // Invalid BCrypt hash format
+            return null;
+        }
+        
+        // Lookup hash matched but BCrypt verification failed (extremely rare - hash collision)
         return null;
+    }
+    
+    /// <summary>
+    /// Generate SHA256 hash of API key for fast indexed lookups
+    /// </summary>
+    private static string HashApiKeyForLookup(string apiKey)
+    {
+        using var sha256 = SHA256.Create();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(apiKey);
+        var hashBytes = sha256.ComputeHash(bytes);
+        return BitConverter.ToString(hashBytes).Replace("-", "").ToLowerInvariant();
     }
     
     /// <summary>

@@ -41,6 +41,10 @@ public class GitClawDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(255);
             
+            entity.Property(e => e.ApiKeyLookupHash)
+                .IsRequired()
+                .HasMaxLength(64);  // SHA256 produces 64 character hex string
+            
             entity.Property(e => e.ClaimToken)
                 .HasMaxLength(100);
             
@@ -50,7 +54,7 @@ public class GitClawDbContext : DbContext
             
             // Indexes
             entity.HasIndex(e => e.Username).IsUnique();
-            entity.HasIndex(e => e.ApiKeyHash);
+            entity.HasIndex(e => e.ApiKeyLookupHash).IsUnique();  // Fast indexed lookup
             entity.HasIndex(e => e.ClaimToken);
         });
         

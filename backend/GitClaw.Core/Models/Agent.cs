@@ -13,7 +13,8 @@ public class Agent
     public string AvatarUrl { get; set; } = string.Empty;
     
     // Authentication
-    public string ApiKeyHash { get; set; } = string.Empty;
+    public string ApiKeyHash { get; set; } = string.Empty;  // BCrypt hash for secure verification
+    public string ApiKeyLookupHash { get; set; } = string.Empty;  // SHA256 hash for fast indexed lookups
     public string? ClaimToken { get; set; }  // For human verification
     public string? VerificationCode { get; set; }  // Format: "color-CODE" (e.g., "blue-AALQ")
     public string RateLimitTier { get; set; } = "unclaimed";  // unclaimed, claimed, premium
