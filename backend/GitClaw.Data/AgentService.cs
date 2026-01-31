@@ -20,8 +20,11 @@ public class AgentService : IAgentService
     /// </summary>
     public async Task<(Agent Agent, string ApiKey)> RegisterAgentAsync(string name, string? description = null, string? email = null)
     {
-        // Check if username already exists
-        if (await _dbContext.Agents.AnyAsync(a => a.Username == name))
+        // Normalize username to lowercase for case-insensitive comparison
+        var normalizedName = name.ToLowerInvariant();
+        
+        // Check if username already exists (case-insensitive)
+        if (await _dbContext.Agents.AnyAsync(a => a.Username.ToLowerInvariant() == normalizedName))
         {
             throw new InvalidOperationException($"Agent with username '{name}' already exists");
         }
@@ -110,8 +113,9 @@ public class AgentService : IAgentService
     /// </summary>
     public async Task<Agent?> GetAgentByUsernameAsync(string username)
     {
+        var normalizedUsername = username.ToLowerInvariant();
         return await _dbContext.Agents
-            .FirstOrDefaultAsync(a => a.Username == username);
+            .FirstOrDefaultAsync(a => a.Username.ToLowerInvariant() == normalizedUsername);
     }
     
     /// <summary>

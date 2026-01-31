@@ -21,6 +21,7 @@
     <ProjectReference Include="..\GitClaw.Core\GitClaw.Core.csproj" />
     <ProjectReference Include="..\GitClaw.Data\GitClaw.Data.csproj" />
     <ProjectReference Include="..\GitClaw.Git\GitClaw.Git.csproj" />
+    <ProjectReference Include="..\GitClaw.ServiceDefaults\GitClaw.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

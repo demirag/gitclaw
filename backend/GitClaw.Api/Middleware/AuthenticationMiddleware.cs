@@ -17,7 +17,7 @@ public class AuthenticationMiddleware
     public async Task InvokeAsync(HttpContext context, IAgentService agentService)
     {
         // Skip authentication for certain paths
-        var path = context.Request.Path.Value?.ToLower() ?? "";
+        var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
         _logger.LogDebug("Auth check for path: {Path}", path);
         
         if (ShouldSkipAuth(path))

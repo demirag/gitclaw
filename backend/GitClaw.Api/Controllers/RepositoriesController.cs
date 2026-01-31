@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
 using LibGit2Sharp;
+using GitClaw.Api.Utils;
 
 namespace GitClaw.Api.Controllers;
 
@@ -105,14 +106,25 @@ public class RepositoriesController : ControllerBase
                 return BadRequest(new { error = "Owner and name are required" });
             }
             
+            // Validate repository name (alphanumeric, hyphens, underscores only)
+            if (!InputSanitizer.IsValidRepositoryName(request.Name))
+            {
+                return BadRequest(new { error = "Repository name must contain only alphanumeric characters, hyphens, and underscores (1-100 characters)" });
+            }
+            
+            // Sanitize inputs
+            var sanitizedOwner = InputSanitizer.Sanitize(request.Owner);
+            var sanitizedName = InputSanitizer.Sanitize(request.Name);
+            var sanitizedDescription = InputSanitizer.Sanitize(request.Description);
+            
             // Check if already exists
-            if (await _repositoryService.ExistsAsync(request.Owner, request.Name))
+            if (await _repositoryService.ExistsAsync(sanitizedOwner, sanitizedName))
             {
                 return Conflict(new { error = "Repository already exists" });
             }
             
             // Generate repository path
-            var repoPath = Path.Combine(RepositoryBasePath, request.Owner, $"{request.Name}.git");
+            var repoPath = Path.Combine(RepositoryBasePath, sanitizedOwner, $"{sanitizedName}.git");
             
             // Initialize git repository
             var success = await _gitService.InitializeRepositoryAsync(repoPath);
@@ -124,9 +136,9 @@ public class RepositoriesController : ControllerBase
             
             // Create database record
             var repository = await _repositoryService.CreateRepositoryAsync(
-                request.Owner, 
-                request.Name, 
-                request.Description,
+                sanitizedOwner, 
+                sanitizedName, 
+                sanitizedDescription,
                 agentId);
             
             _logger.LogInformation("Created repository: {Owner}/{Name}", request.Owner, request.Name);
@@ -223,10 +235,13 @@ public class RepositoriesController : ControllerBase
     {
         try
         {
+            // Sanitize inputs
+            var sanitizedDescription = InputSanitizer.Sanitize(request.Description);
+            
             var repository = await _repositoryService.UpdateRepositoryAsync(
                 owner, 
                 name, 
-                description: request.Description,
+                description: sanitizedDescription,
                 isPrivate: request.IsPrivate);
             
             if (repository == null)
@@ -442,6 +457,19 @@ public class RepositoriesController : ControllerBase
             
             // Use LibGit2Sharp to browse repository files
             using var repo = new LibGit2Sharp.Repository(repoPath);
+            
+            // Check if repository is empty (no commits)
+            if (repo.Head.Tip == null)
+            {
+                // Return empty directory for empty repositories
+                return Ok(new
+                {
+                    type = "directory",
+                    path = path?.Trim('/') ?? "",
+                    entries = new object[0],
+                    count = 0
+                });
+            }
             
             // Get the reference (default to HEAD)
             var reference = ref_ ?? "HEAD";

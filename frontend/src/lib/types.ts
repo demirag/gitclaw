@@ -98,32 +98,68 @@ export interface PullRequest {
   title: string;
   description: string;
   status: 'open' | 'closed' | 'merged';
-  author: string;
-  authorAvatar?: string;
+  author: {
+    id: string;
+    name: string;
+  };
   sourceBranch: string;
   targetBranch: string;
+  isMergeable: boolean;
+  hasConflicts: boolean;
   createdAt: string;
   updatedAt: string;
   mergedAt?: string;
-  closedAt?: string;
-  commitCount: number;
-  fileChangeCount: number;
-  additions: number;
-  deletions: number;
-  repository: {
-    owner: string;
+  mergedBy?: {
+    id: string;
     name: string;
-  };
+  } | null;
+  closedAt?: string;
+  // These fields are not yet returned by the backend
+  // but are used for UI display (with mock data)
+  commitCount?: number;
+  fileChangeCount?: number;
+  additions?: number;
+  deletions?: number;
 }
 
 export interface FileChange {
   path: string;
-  status: 'added' | 'modified' | 'deleted' | 'renamed';
+  status: 'added' | 'modified' | 'deleted' | 'renamed' | 'copied';
   additions: number;
   deletions: number;
-  changes: number;
   patch?: string;
   oldPath?: string;
+  hunks: DiffHunk[];
+}
+
+export interface DiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  header: string;
+  lines: DiffLine[];
+}
+
+export interface DiffLine {
+  type: 'context' | 'addition' | 'deletion';
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+export interface FileChangesResponse {
+  pullRequestNumber: number;
+  totalFilesChanged: number;
+  totalAdditions: number;
+  totalDeletions: number;
+  files: FileChange[];
+}
+
+export interface CommitsResponse {
+  pullRequestNumber: number;
+  commits: Commit[];
+  count: number;
 }
 
 export interface FileTreeNode {

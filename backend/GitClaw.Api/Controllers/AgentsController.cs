@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using GitClaw.Core.Interfaces;
+using GitClaw.Api.Utils;
 
 namespace GitClaw.Api.Controllers;
 
@@ -29,10 +30,26 @@ public class AgentsController : ControllerBase
                 return BadRequest(new { error = "Name is required" });
             }
             
+            // Validate and sanitize inputs
+            if (!InputSanitizer.IsValidUsername(request.Name))
+            {
+                return BadRequest(new { error = "Username must contain only alphanumeric characters, hyphens, and underscores (1-39 characters)" });
+            }
+            
+            if (!string.IsNullOrWhiteSpace(request.Email) && !InputSanitizer.IsValidEmail(request.Email))
+            {
+                return BadRequest(new { error = "Invalid email format" });
+            }
+            
+            // Sanitize inputs
+            var sanitizedName = InputSanitizer.Sanitize(request.Name);
+            var sanitizedDescription = InputSanitizer.Sanitize(request.Description);
+            var sanitizedEmail = InputSanitizer.Sanitize(request.Email);
+            
             var (agent, apiKey) = await _agentService.RegisterAgentAsync(
-                request.Name,
-                request.Description,
-                request.Email
+                sanitizedName,
+                sanitizedDescription,
+                sanitizedEmail
             );
             
             var baseUrl = $"{Request.Scheme}://{Request.Host}";

@@ -12,17 +12,21 @@ public class PullRequestsController : ControllerBase
 {
     private readonly IPullRequestService _pullRequestService;
     private readonly IRepositoryService _repositoryService;
+    private readonly IGitService _gitService;
     private readonly GitClawDbContext _dbContext;
     private readonly ILogger<PullRequestsController> _logger;
+    private const string RepositoryBasePath = "/tmp/gitclaw-repos";
     
     public PullRequestsController(
         IPullRequestService pullRequestService,
         IRepositoryService repositoryService,
+        IGitService gitService,
         GitClawDbContext dbContext,
         ILogger<PullRequestsController> logger)
     {
         _pullRequestService = pullRequestService;
         _repositoryService = repositoryService;
+        _gitService = gitService;
         _dbContext = dbContext;
         _logger = logger;
     }
@@ -222,6 +226,123 @@ public class PullRequestsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting pull request");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Get file changes for a pull request
+    /// </summary>
+    [HttpGet("{number}/files")]
+    public async Task<IActionResult> GetFileChanges(string owner, string repo, int number)
+    {
+        try
+        {
+            var pullRequest = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
+            
+            if (pullRequest == null)
+            {
+                return NotFound(new { error = "Pull request not found" });
+            }
+            
+            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
+            
+            if (!await _gitService.RepositoryExistsAsync(repoPath))
+            {
+                return NotFound(new { error = "Repository not found on disk" });
+            }
+            
+            var diff = await _gitService.GetDiffBetweenBranchesAsync(
+                repoPath, 
+                pullRequest.SourceBranch, 
+                pullRequest.TargetBranch);
+            
+            return Ok(new
+            {
+                pullRequestNumber = number,
+                totalFilesChanged = diff.TotalFilesChanged,
+                totalAdditions = diff.TotalAdditions,
+                totalDeletions = diff.TotalDeletions,
+                files = diff.Files.Select(f => new
+                {
+                    path = f.Path,
+                    oldPath = f.OldPath,
+                    status = f.Status.ToString().ToLower(),
+                    additions = f.Additions,
+                    deletions = f.Deletions,
+                    patch = f.Patch,
+                    hunks = f.Hunks.Select(h => new
+                    {
+                        oldStart = h.OldStart,
+                        oldLines = h.OldLines,
+                        newStart = h.NewStart,
+                        newLines = h.NewLines,
+                        header = h.Header,
+                        lines = h.Lines.Select(l => new
+                        {
+                            type = l.Type.ToString().ToLower(),
+                            content = l.Content,
+                            oldLineNumber = l.OldLineNumber,
+                            newLineNumber = l.NewLineNumber
+                        })
+                    })
+                })
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting file changes for PR");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Get commits for a pull request
+    /// </summary>
+    [HttpGet("{number}/commits")]
+    public async Task<IActionResult> GetCommits(string owner, string repo, int number)
+    {
+        try
+        {
+            var pullRequest = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
+            
+            if (pullRequest == null)
+            {
+                return NotFound(new { error = "Pull request not found" });
+            }
+            
+            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
+            
+            if (!await _gitService.RepositoryExistsAsync(repoPath))
+            {
+                return NotFound(new { error = "Repository not found on disk" });
+            }
+            
+            var commits = await _gitService.GetCommitsBetweenBranchesAsync(
+                repoPath, 
+                pullRequest.SourceBranch, 
+                pullRequest.TargetBranch);
+            
+            return Ok(new
+            {
+                pullRequestNumber = number,
+                commits = commits.Select(c => new
+                {
+                    sha = c.Sha,
+                    message = c.Message,
+                    author = new
+                    {
+                        name = c.Author,
+                        email = c.Email,
+                        date = c.When
+                    }
+                }),
+                count = commits.Count()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting commits for PR");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
