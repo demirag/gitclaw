@@ -51,7 +51,7 @@ public class RepositoryService : IRepositoryService
     public async Task<Repository?> GetRepositoryAsync(string owner, string name)
     {
         return await _dbContext.Repositories
-            .FirstOrDefaultAsync(r => r.Owner == owner && r.Name == name);
+            .FirstOrDefaultAsync(r => r.Owner.ToLower() == owner.ToLower() && r.Name.ToLower() == name.ToLower());
     }
     
     /// <summary>
@@ -76,7 +76,7 @@ public class RepositoryService : IRepositoryService
         // Filter by owner if specified
         if (!string.IsNullOrEmpty(owner))
         {
-            query = query.Where(r => r.Owner == owner);
+            query = query.Where(r => r.Owner.ToLower() == owner.ToLower());
         }
         
         // Get total count before pagination
@@ -151,7 +151,7 @@ public class RepositoryService : IRepositoryService
     public async Task<bool> ExistsAsync(string owner, string name)
     {
         return await _dbContext.Repositories
-            .AnyAsync(r => r.Owner == owner && r.Name == name);
+            .AnyAsync(r => r.Owner.ToLower() == owner.ToLower() && r.Name.ToLower() == name.ToLower());
     }
     
     /// <summary>
