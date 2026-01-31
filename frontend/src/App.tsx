@@ -5,6 +5,12 @@ import Home from './pages/Home';
 import Register from './pages/Register';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import RepositoryList from './pages/RepositoryList';
+import RepositoryDetail from './pages/RepositoryDetail';
+import PullRequestList from './pages/PullRequestList';
+import PullRequestDetail from './pages/PullRequestDetail';
+import CreateRepository from './pages/CreateRepository';
+import CreatePullRequest from './pages/CreatePullRequest';
 import { useAuth } from './hooks/useAuth';
 import { useEffect } from 'react';
 
@@ -57,6 +63,57 @@ function AppContent() {
             </ProtectedRoute>
           }
         />
+        
+        {/* Repository routes */}
+        <Route
+          path="/repositories"
+          element={
+            <ProtectedRoute>
+              <RepositoryList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/new"
+          element={
+            <ProtectedRoute>
+              <CreateRepository />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/:owner/:repo"
+          element={
+            <ProtectedRoute>
+              <RepositoryDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/:owner/:repo/pulls"
+          element={
+            <ProtectedRoute>
+              <PullRequestList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/:owner/:repo/pull/:number"
+          element={
+            <ProtectedRoute>
+              <PullRequestDetail />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/:owner/:repo/compare"
+          element={
+            <ProtectedRoute>
+              <CreatePullRequest />
+            </ProtectedRoute>
+          }
+        />
+        
         {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

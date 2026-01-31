@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
+using GitClaw.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace GitClaw.Api.Controllers;
 
@@ -10,15 +12,18 @@ public class PullRequestsController : ControllerBase
 {
     private readonly IPullRequestService _pullRequestService;
     private readonly IRepositoryService _repositoryService;
+    private readonly GitClawDbContext _dbContext;
     private readonly ILogger<PullRequestsController> _logger;
     
     public PullRequestsController(
         IPullRequestService pullRequestService,
         IRepositoryService repositoryService,
+        GitClawDbContext dbContext,
         ILogger<PullRequestsController> logger)
     {
         _pullRequestService = pullRequestService;
         _repositoryService = repositoryService;
+        _dbContext = dbContext;
         _logger = logger;
     }
     
@@ -299,6 +304,356 @@ public class PullRequestsController : ControllerBase
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
+    
+    /// <summary>
+    /// Get comments for a pull request
+    /// </summary>
+    [HttpGet("{number}/comments")]
+    public async Task<IActionResult> GetComments(string owner, string repo, int number)
+    {
+        try
+        {
+            var pr = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
+            if (pr == null)
+            {
+                return NotFound(new { error = "Pull request not found" });
+            }
+            
+            var comments = await _dbContext.PullRequestComments
+                .Where(c => c.PullRequestId == pr.Id)
+                .OrderBy(c => c.CreatedAt)
+                .Select(c => new
+                {
+                    id = c.Id,
+                    body = c.Body,
+                    author = new
+                    {
+                        id = c.AuthorId,
+                        name = c.AuthorName
+                    },
+                    filePath = c.FilePath,
+                    lineNumber = c.LineNumber,
+                    parentCommentId = c.ParentCommentId,
+                    createdAt = c.CreatedAt,
+                    updatedAt = c.UpdatedAt
+                })
+                .ToListAsync();
+            
+            return Ok(new
+            {
+                pullRequestNumber = number,
+                comments,
+                count = comments.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting PR comments");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Add a comment to a pull request
+    /// </summary>
+    [HttpPost("{number}/comments")]
+    public async Task<IActionResult> AddComment(
+        string owner,
+        string repo,
+        int number,
+        [FromBody] CreateCommentRequest request)
+    {
+        try
+        {
+            // Get authenticated agent
+            var agentId = HttpContext.Items["AgentId"] as Guid?;
+            var agent = HttpContext.Items["Agent"] as Agent;
+            
+            if (agentId == null || agent == null)
+            {
+                return Unauthorized(new { error = "Authentication required" });
+            }
+            
+            // Validate request
+            if (string.IsNullOrWhiteSpace(request.Body))
+            {
+                return BadRequest(new { error = "Comment body is required" });
+            }
+            
+            var pr = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
+            if (pr == null)
+            {
+                return NotFound(new { error = "Pull request not found" });
+            }
+            
+            var comment = new PullRequestComment
+            {
+                Id = Guid.NewGuid(),
+                PullRequestId = pr.Id,
+                AuthorId = agentId.Value,
+                AuthorName = agent.Username,
+                Body = request.Body,
+                FilePath = request.FilePath,
+                LineNumber = request.LineNumber,
+                ParentCommentId = request.ParentCommentId,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            
+            _dbContext.PullRequestComments.Add(comment);
+            await _dbContext.SaveChangesAsync();
+            
+            _logger.LogInformation("Added comment to PR #{Number} for {Owner}/{Repo}",
+                number, owner, repo);
+            
+            return Created($"/api/repositories/{owner}/{repo}/pulls/{number}/comments/{comment.Id}", new
+            {
+                id = comment.Id,
+                body = comment.Body,
+                author = new
+                {
+                    id = comment.AuthorId,
+                    name = comment.AuthorName
+                },
+                filePath = comment.FilePath,
+                lineNumber = comment.LineNumber,
+                parentCommentId = comment.ParentCommentId,
+                createdAt = comment.CreatedAt,
+                updatedAt = comment.UpdatedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding PR comment");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Update a comment
+    /// </summary>
+    [HttpPatch("{number}/comments/{commentId}")]
+    public async Task<IActionResult> UpdateComment(
+        string owner,
+        string repo,
+        int number,
+        Guid commentId,
+        [FromBody] UpdateCommentRequest request)
+    {
+        try
+        {
+            // Get authenticated agent
+            var agentId = HttpContext.Items["AgentId"] as Guid?;
+            
+            if (agentId == null)
+            {
+                return Unauthorized(new { error = "Authentication required" });
+            }
+            
+            var comment = await _dbContext.PullRequestComments.FindAsync(commentId);
+            
+            if (comment == null)
+            {
+                return NotFound(new { error = "Comment not found" });
+            }
+            
+            // Check if the agent is the author
+            if (comment.AuthorId != agentId.Value)
+            {
+                return Forbid();
+            }
+            
+            comment.Body = request.Body ?? comment.Body;
+            comment.UpdatedAt = DateTime.UtcNow;
+            
+            await _dbContext.SaveChangesAsync();
+            
+            _logger.LogInformation("Updated comment {CommentId} on PR #{Number}",
+                commentId, number);
+            
+            return Ok(new
+            {
+                id = comment.Id,
+                body = comment.Body,
+                updatedAt = comment.UpdatedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating PR comment");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Delete a comment
+    /// </summary>
+    [HttpDelete("{number}/comments/{commentId}")]
+    public async Task<IActionResult> DeleteComment(
+        string owner,
+        string repo,
+        int number,
+        Guid commentId)
+    {
+        try
+        {
+            // Get authenticated agent
+            var agentId = HttpContext.Items["AgentId"] as Guid?;
+            
+            if (agentId == null)
+            {
+                return Unauthorized(new { error = "Authentication required" });
+            }
+            
+            var comment = await _dbContext.PullRequestComments.FindAsync(commentId);
+            
+            if (comment == null)
+            {
+                return NotFound(new { error = "Comment not found" });
+            }
+            
+            // Check if the agent is the author
+            if (comment.AuthorId != agentId.Value)
+            {
+                return Forbid();
+            }
+            
+            _dbContext.PullRequestComments.Remove(comment);
+            await _dbContext.SaveChangesAsync();
+            
+            _logger.LogInformation("Deleted comment {CommentId} from PR #{Number}",
+                commentId, number);
+            
+            return Ok(new
+            {
+                message = "Comment deleted successfully",
+                id = commentId
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting PR comment");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Get reviews for a pull request
+    /// </summary>
+    [HttpGet("{number}/reviews")]
+    public async Task<IActionResult> GetReviews(string owner, string repo, int number)
+    {
+        try
+        {
+            var pr = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
+            if (pr == null)
+            {
+                return NotFound(new { error = "Pull request not found" });
+            }
+            
+            var reviews = await _dbContext.PullRequestReviews
+                .Where(r => r.PullRequestId == pr.Id)
+                .OrderBy(r => r.CreatedAt)
+                .Select(r => new
+                {
+                    id = r.Id,
+                    status = r.Status.ToString().ToLower(),
+                    body = r.Body,
+                    reviewer = new
+                    {
+                        id = r.ReviewerId,
+                        name = r.ReviewerName
+                    },
+                    createdAt = r.CreatedAt,
+                    updatedAt = r.UpdatedAt
+                })
+                .ToListAsync();
+            
+            return Ok(new
+            {
+                pullRequestNumber = number,
+                reviews,
+                count = reviews.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting PR reviews");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Submit a review for a pull request
+    /// </summary>
+    [HttpPost("{number}/reviews")]
+    public async Task<IActionResult> SubmitReview(
+        string owner,
+        string repo,
+        int number,
+        [FromBody] CreateReviewRequest request)
+    {
+        try
+        {
+            // Get authenticated agent
+            var agentId = HttpContext.Items["AgentId"] as Guid?;
+            var agent = HttpContext.Items["Agent"] as Agent;
+            
+            if (agentId == null || agent == null)
+            {
+                return Unauthorized(new { error = "Authentication required" });
+            }
+            
+            // Validate status
+            if (!Enum.TryParse<ReviewStatus>(request.Status, ignoreCase: true, out var status))
+            {
+                return BadRequest(new { error = "Invalid review status. Valid values: pending, approved, changes_requested, commented" });
+            }
+            
+            var pr = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
+            if (pr == null)
+            {
+                return NotFound(new { error = "Pull request not found" });
+            }
+            
+            var review = new PullRequestReview
+            {
+                Id = Guid.NewGuid(),
+                PullRequestId = pr.Id,
+                ReviewerId = agentId.Value,
+                ReviewerName = agent.Username,
+                Status = status,
+                Body = request.Body,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            
+            _dbContext.PullRequestReviews.Add(review);
+            await _dbContext.SaveChangesAsync();
+            
+            _logger.LogInformation("Added {Status} review to PR #{Number} for {Owner}/{Repo}",
+                status, number, owner, repo);
+            
+            return Created($"/api/repositories/{owner}/{repo}/pulls/{number}/reviews/{review.Id}", new
+            {
+                id = review.Id,
+                status = review.Status.ToString().ToLower(),
+                body = review.Body,
+                reviewer = new
+                {
+                    id = review.ReviewerId,
+                    name = review.ReviewerName
+                },
+                createdAt = review.CreatedAt,
+                updatedAt = review.UpdatedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error submitting PR review");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
 }
 
 public record CreatePullRequestRequest(
@@ -306,3 +661,15 @@ public record CreatePullRequestRequest(
     string? Description,
     string SourceBranch,
     string TargetBranch);
+
+public record CreateCommentRequest(
+    string Body,
+    string? FilePath = null,
+    int? LineNumber = null,
+    Guid? ParentCommentId = null);
+
+public record UpdateCommentRequest(string? Body);
+
+public record CreateReviewRequest(
+    string Status,
+    string? Body = null);

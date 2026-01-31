@@ -3,6 +3,7 @@ using System;
 using GitClaw.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GitClaw.Data.Migrations
 {
     [DbContext(typeof(GitClawDbContext))]
-    partial class GitClawDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260131023524_AddPRCommentsAndReviews")]
+    partial class AddPRCommentsAndReviews
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

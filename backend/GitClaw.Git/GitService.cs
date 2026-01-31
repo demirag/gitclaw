@@ -35,6 +35,12 @@ public class GitService : IGitService
         {
             using var repo = new Repository(path);
             
+            // Check if repository is empty (no HEAD)
+            if (repo.Head == null || repo.Head.Tip == null)
+            {
+                return Task.FromResult(Enumerable.Empty<CommitInfo>());
+            }
+            
             var commits = repo.Commits
                 .Take(limit)
                 .Select(c => new CommitInfo
@@ -59,7 +65,14 @@ public class GitService : IGitService
         try
         {
             using var repo = new Repository(path);
-            var branches = repo.Branches.Select(b => b.FriendlyName);
+            
+            // Return empty list if no branches exist
+            if (!repo.Branches.Any())
+            {
+                return Task.FromResult(Enumerable.Empty<string>());
+            }
+            
+            var branches = repo.Branches.Select(b => b.FriendlyName).ToList();
             return Task.FromResult(branches.AsEnumerable());
         }
         catch (Exception)
@@ -74,19 +87,33 @@ public class GitService : IGitService
         {
             using var repo = new Repository(path);
             
+            // Initialize stats with safe defaults
             var stats = new RepositoryStats
             {
-                CommitCount = repo.Commits.Count(),
+                CommitCount = 0,
                 BranchCount = repo.Branches.Count(),
                 Size = CalculateRepositorySize(path),
-                LastCommit = repo.Commits.FirstOrDefault()?.Author.When.DateTime
+                LastCommit = null
             };
+            
+            // Only count commits if repository has HEAD
+            if (repo.Head != null && repo.Head.Tip != null)
+            {
+                stats.CommitCount = repo.Commits.Count();
+                stats.LastCommit = repo.Commits.FirstOrDefault()?.Author.When.DateTime;
+            }
             
             return Task.FromResult(stats);
         }
         catch (Exception)
         {
-            return Task.FromResult(new RepositoryStats());
+            return Task.FromResult(new RepositoryStats
+            {
+                CommitCount = 0,
+                BranchCount = 0,
+                Size = CalculateRepositorySize(path),
+                LastCommit = null
+            });
         }
     }
     

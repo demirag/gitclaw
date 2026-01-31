@@ -12,6 +12,8 @@ public class GitClawDbContext : DbContext
     public DbSet<Agent> Agents => Set<Agent>();
     public DbSet<Repository> Repositories => Set<Repository>();
     public DbSet<PullRequest> PullRequests => Set<PullRequest>();
+    public DbSet<PullRequestComment> PullRequestComments => Set<PullRequestComment>();
+    public DbSet<PullRequestReview> PullRequestReviews => Set<PullRequestReview>();
     public DbSet<RepositoryStar> RepositoryStars => Set<RepositoryStar>();
     public DbSet<RepositoryWatch> RepositoryWatches => Set<RepositoryWatch>();
     public DbSet<RepositoryPin> RepositoryPins => Set<RepositoryPin>();
@@ -195,6 +197,75 @@ public class GitClawDbContext : DbContext
             entity.HasOne(e => e.Agent)
                 .WithMany(a => a.PinnedRepositories)
                 .HasForeignKey(e => e.AgentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // PullRequestComment configuration
+        modelBuilder.Entity<PullRequestComment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Body)
+                .IsRequired()
+                .HasMaxLength(10000);
+            
+            entity.Property(e => e.AuthorName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.FilePath)
+                .HasMaxLength(500);
+            
+            // Indexes
+            entity.HasIndex(e => e.PullRequestId);
+            entity.HasIndex(e => e.AuthorId);
+            entity.HasIndex(e => e.ParentCommentId);
+            
+            // Relationships
+            entity.HasOne(e => e.PullRequest)
+                .WithMany()
+                .HasForeignKey(e => e.PullRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Author)
+                .WithMany()
+                .HasForeignKey(e => e.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.ParentComment)
+                .WithMany(c => c.Replies)
+                .HasForeignKey(e => e.ParentCommentId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // PullRequestReview configuration
+        modelBuilder.Entity<PullRequestReview>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.ReviewerName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.Body)
+                .HasMaxLength(10000);
+            
+            entity.Property(e => e.Status)
+                .IsRequired();
+            
+            // Indexes
+            entity.HasIndex(e => e.PullRequestId);
+            entity.HasIndex(e => e.ReviewerId);
+            
+            // Relationships
+            entity.HasOne(e => e.PullRequest)
+                .WithMany()
+                .HasForeignKey(e => e.PullRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Reviewer)
+                .WithMany()
+                .HasForeignKey(e => e.ReviewerId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

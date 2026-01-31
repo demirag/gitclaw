@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
+using LibGit2Sharp;
 
 namespace GitClaw.Api.Controllers;
 
@@ -395,18 +396,225 @@ public class RepositoriesController : ControllerBase
                 return NotFound(new { error = "Repository not found" });
             }
             
-            var branches = await _gitService.GetBranchesAsync(repoPath);
+            IEnumerable<string> branches;
+            try
+            {
+                branches = await _gitService.GetBranchesAsync(repoPath);
+            }
+            catch (Exception branchEx)
+            {
+                _logger.LogWarning(branchEx, "Error reading branches from {RepoPath}, returning empty list", repoPath);
+                branches = Enumerable.Empty<string>();
+            }
             
             return Ok(new
             {
                 owner,
                 name,
-                branches
+                branches = branches.ToList()
             });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting branches");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Browse files in a repository
+    /// </summary>
+    [HttpGet("{owner}/{name}/tree/{*path}")]
+    public async Task<IActionResult> BrowseFiles(
+        string owner,
+        string name,
+        string? path = null,
+        [FromQuery] string? ref_ = null)
+    {
+        try
+        {
+            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            
+            if (!await _gitService.RepositoryExistsAsync(repoPath))
+            {
+                return NotFound(new { error = "Repository not found" });
+            }
+            
+            // Use LibGit2Sharp to browse repository files
+            using var repo = new LibGit2Sharp.Repository(repoPath);
+            
+            // Get the reference (default to HEAD)
+            var reference = ref_ ?? "HEAD";
+            LibGit2Sharp.Commit commit;
+            
+            try
+            {
+                commit = repo.Lookup<LibGit2Sharp.Commit>(reference);
+                if (commit == null)
+                {
+                    return NotFound(new { error = $"Reference '{reference}' not found" });
+                }
+            }
+            catch
+            {
+                return NotFound(new { error = $"Reference '{reference}' not found" });
+            }
+            
+            // Get the tree
+            var tree = commit.Tree;
+            var targetPath = path?.Trim('/') ?? "";
+            
+            // Navigate to the target path
+            LibGit2Sharp.Tree? targetTree = tree;
+            if (!string.IsNullOrEmpty(targetPath))
+            {
+                var treeEntry = tree[targetPath];
+                if (treeEntry == null)
+                {
+                    return NotFound(new { error = "Path not found" });
+                }
+                
+                if (treeEntry.TargetType == LibGit2Sharp.TreeEntryTargetType.Tree)
+                {
+                    targetTree = treeEntry.Target as LibGit2Sharp.Tree;
+                }
+                else
+                {
+                    // It's a file, return file content
+                    var blob = treeEntry.Target as LibGit2Sharp.Blob;
+                    if (blob == null)
+                    {
+                        return NotFound(new { error = "File not found" });
+                    }
+                    
+                    var contentStream = blob.GetContentStream();
+                    using var reader = new StreamReader(contentStream);
+                    var content = await reader.ReadToEndAsync();
+                    
+                    return Ok(new
+                    {
+                        type = "file",
+                        path = targetPath,
+                        name = Path.GetFileName(targetPath),
+                        size = blob.Size,
+                        content,
+                        sha = treeEntry.Target.Sha
+                    });
+                }
+            }
+            
+            if (targetTree == null)
+            {
+                return NotFound(new { error = "Path not found" });
+            }
+            
+            // List directory contents
+            var entries = targetTree.Select(entry => new
+            {
+                type = entry.TargetType == LibGit2Sharp.TreeEntryTargetType.Tree ? "directory" : "file",
+                name = entry.Name,
+                path = string.IsNullOrEmpty(targetPath) ? entry.Name : $"{targetPath}/{entry.Name}",
+                size = entry.TargetType == LibGit2Sharp.TreeEntryTargetType.Blob ? 
+                    ((LibGit2Sharp.Blob)entry.Target).Size : 0,
+                sha = entry.Target.Sha
+            }).ToList();
+            
+            return Ok(new
+            {
+                type = "directory",
+                path = targetPath,
+                entries,
+                count = entries.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error browsing repository files");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+    
+    /// <summary>
+    /// Get raw file content
+    /// </summary>
+    [HttpGet("{owner}/{name}/raw/{*path}")]
+    public async Task<IActionResult> GetRawFile(
+        string owner,
+        string name,
+        string path,
+        [FromQuery] string? ref_ = null)
+    {
+        try
+        {
+            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            
+            if (!await _gitService.RepositoryExistsAsync(repoPath))
+            {
+                return NotFound(new { error = "Repository not found" });
+            }
+            
+            using var repo = new LibGit2Sharp.Repository(repoPath);
+            
+            var reference = ref_ ?? "HEAD";
+            LibGit2Sharp.Commit commit;
+            
+            try
+            {
+                commit = repo.Lookup<LibGit2Sharp.Commit>(reference);
+                if (commit == null)
+                {
+                    return NotFound(new { error = $"Reference '{reference}' not found" });
+                }
+            }
+            catch
+            {
+                return NotFound(new { error = $"Reference '{reference}' not found" });
+            }
+            
+            var tree = commit.Tree;
+            var targetPath = path.Trim('/');
+            var treeEntry = tree[targetPath];
+            
+            if (treeEntry == null || treeEntry.TargetType != LibGit2Sharp.TreeEntryTargetType.Blob)
+            {
+                return NotFound(new { error = "File not found" });
+            }
+            
+            var blob = treeEntry.Target as LibGit2Sharp.Blob;
+            if (blob == null)
+            {
+                return NotFound(new { error = "File not found" });
+            }
+            
+            var contentStream = blob.GetContentStream();
+            
+            // Determine content type based on file extension
+            var extension = Path.GetExtension(path).ToLowerInvariant();
+            var contentType = extension switch
+            {
+                ".txt" => "text/plain",
+                ".md" => "text/markdown",
+                ".json" => "application/json",
+                ".xml" => "application/xml",
+                ".html" => "text/html",
+                ".css" => "text/css",
+                ".js" => "application/javascript",
+                ".cs" => "text/plain",
+                ".py" => "text/plain",
+                ".java" => "text/plain",
+                ".cpp" or ".c" or ".h" => "text/plain",
+                ".png" => "image/png",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".gif" => "image/gif",
+                ".svg" => "image/svg+xml",
+                _ => "application/octet-stream"
+            };
+            
+            return File(contentStream, contentType, Path.GetFileName(path));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting raw file");
             return StatusCode(500, new { error = "Internal server error" });
         }
     }
