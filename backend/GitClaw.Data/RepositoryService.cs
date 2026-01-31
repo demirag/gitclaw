@@ -19,7 +19,7 @@ public class RepositoryService : IRepositoryService
     public async Task<Repository> CreateRepositoryAsync(string owner, string name, string? description = null, Guid? agentId = null)
     {
         // Check if already exists
-        if (await ExistsAsync(owner, name))
+        if (await ExistsAsync(owner, name).ConfigureAwait(false))
         {
             throw new InvalidOperationException($"Repository '{owner}/{name}' already exists");
         }
@@ -40,7 +40,7 @@ public class RepositoryService : IRepositoryService
         };
         
         _dbContext.Repositories.Add(repository);
-        await _dbContext.SaveChangesAsync();
+        await _dbContext.SaveChangesAsync().ConfigureAwait(false);
         
         return repository;
     }

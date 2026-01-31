@@ -9,6 +9,9 @@ namespace GitClaw.Data;
 public class AgentService : IAgentService
 {
     private readonly GitClawDbContext _dbContext;
+    private static readonly Dictionary<string, (Guid AgentId, DateTime CachedAt)> _apiKeyCache = new();
+    private static readonly object _cacheLock = new object();
+    private const int CacheExpirationMinutes = 15;
     
     public AgentService(GitClawDbContext dbContext)
     {
@@ -68,7 +71,7 @@ public class AgentService : IAgentService
     }
     
     /// <summary>
-    /// Validate API key and return agent
+    /// Validate API key and return agent (with caching)
     /// </summary>
     public async Task<Agent?> ValidateApiKeyAsync(string apiKey)
     {
@@ -77,9 +80,49 @@ public class AgentService : IAgentService
             return null;
         }
         
-        // Get all agents and check each hash
-        // Note: BCrypt verification must be done in-memory, can't query by hash
-        var agents = await _dbContext.Agents.ToListAsync();
+        // Check cache first (massive performance improvement)
+        Guid? cachedAgentId = null;
+        lock (_cacheLock)
+        {
+            if (_apiKeyCache.TryGetValue(apiKey, out var cached))
+            {
+                // Check if cache entry is still valid
+                if ((DateTime.UtcNow - cached.CachedAt).TotalMinutes < CacheExpirationMinutes)
+                {
+                    cachedAgentId = cached.AgentId;
+                }
+                else
+                {
+                    // Cache expired, remove
+                    _apiKeyCache.Remove(apiKey);
+                }
+            }
+        }
+        
+        // If we found a cached ID, load the agent (outside the lock)
+        if (cachedAgentId.HasValue)
+        {
+            var cachedAgent = await _dbContext.Agents
+                .AsNoTracking()
+                .FirstOrDefaultAsync(a => a.Id == cachedAgentId.Value);
+            
+            if (cachedAgent != null)
+            {
+                return cachedAgent;
+            }
+            
+            // Agent was deleted, remove from cache
+            lock (_cacheLock)
+            {
+                _apiKeyCache.Remove(apiKey);
+            }
+        }
+        
+        // Cache miss - need to verify API key (slow)
+        // Get all agents (unfortunately BCrypt requires in-memory verification)
+        var agents = await _dbContext.Agents
+            .AsNoTracking()
+            .ToListAsync();
         
         foreach (var agent in agents)
         {
@@ -87,6 +130,12 @@ public class AgentService : IAgentService
             {
                 if (BCrypt.Net.BCrypt.Verify(apiKey, agent.ApiKeyHash))
                 {
+                    // Add to cache for future requests
+                    lock (_cacheLock)
+                    {
+                        _apiKeyCache[apiKey] = (agent.Id, DateTime.UtcNow);
+                    }
+                    
                     return agent;
                 }
             }

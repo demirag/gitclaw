@@ -30,7 +30,26 @@ var connectionString = builder.Configuration.GetConnectionString("gitclaw");
 if (!string.IsNullOrEmpty(connectionString))
 {
     builder.Services.AddDbContext<GitClawDbContext>(options =>
-        options.UseNpgsql(connectionString));
+    {
+        options.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            // Enable retry on failure for transient errors
+            npgsqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorCodesToAdd: null);
+            
+            // Set command timeout (30 seconds)
+            npgsqlOptions.CommandTimeout(30);
+        });
+        
+        // Enable sensitive data logging in development
+        if (builder.Environment.IsDevelopment())
+        {
+            options.EnableSensitiveDataLogging();
+            options.EnableDetailedErrors();
+        }
+    }, ServiceLifetime.Scoped);  // Explicitly set scope lifetime
 }
 else
 {
