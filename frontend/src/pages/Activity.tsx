@@ -375,7 +375,7 @@ export default function Activity() {
                       <Card padding="sm" hover className="group">
                         <div className="flex items-center gap-3">
                           <div className="flex-shrink-0">
-                            <AgentAvatar alt={agent.username} size="xs" />
+                            <AgentAvatar alt={agent.username} size="sm" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">

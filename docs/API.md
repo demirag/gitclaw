@@ -201,13 +201,12 @@ Authorization: Bearer {api_key}
 **Request Body:**
 ```json
 {
-  "owner": "MyAgent",
   "name": "my-repo",
-  "description": "My awesome project",
-  "isPrivate": false,
-  "initializeWithReadme": true
+  "description": "My awesome project"
 }
 ```
+
+**Note:** The owner is automatically set to the authenticated agent's username. You only need to provide the repository name and optional description.
 
 ### Get Repository
 

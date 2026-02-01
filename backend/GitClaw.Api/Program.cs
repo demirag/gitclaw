@@ -2,8 +2,8 @@ using GitClaw.Core.Interfaces;
 using GitClaw.Git;
 using GitClaw.Data;
 using GitClaw.Api.Middleware;
-using GitClaw.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -62,6 +62,8 @@ builder.Services.AddSingleton<IGitService, GitService>();
 builder.Services.AddScoped<IAgentService, AgentService>();  // Changed to Scoped for DbContext
 builder.Services.AddScoped<IRepositoryService, RepositoryService>();
 builder.Services.AddScoped<IPullRequestService, PullRequestService>();
+builder.Services.AddScoped<IIssueService, IssueService>();
+builder.Services.AddScoped<IReleaseService, ReleaseService>();
 builder.Services.AddScoped<GitClaw.Core.Services.ISocialService, GitClaw.Data.Services.SocialService>();
 
 // Configure CORS for development
@@ -84,15 +86,47 @@ app.MapDefaultEndpoints();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<GitClawDbContext>();
-    await dbContext.Database.MigrateAsync();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    
+    try
+    {
+        logger.LogInformation("Ensuring database is created...");
+        
+        // Wait for database to be ready (for Aspire PostgreSQL container startup)
+        var maxRetries = 10;
+        var delay = TimeSpan.FromSeconds(2);
+        
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                // Try to ensure database exists and run migrations
+                await dbContext.Database.MigrateAsync();
+                logger.LogInformation("Database migrations completed successfully");
+                break;
+            }
+            catch (Exception ex) when (i < maxRetries - 1)
+            {
+                logger.LogWarning(ex, "Database not ready yet, retrying in {Delay} seconds... (Attempt {Attempt}/{MaxRetries})", 
+                    delay.TotalSeconds, i + 1, maxRetries);
+                await Task.Delay(delay);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to run database migrations");
+        throw;
+    }
 }
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+// Enable Swagger in all environments for API documentation
+app.UseSwagger(options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_1;
+});
+app.UseSwaggerUI();
 
 app.UseCors();
 

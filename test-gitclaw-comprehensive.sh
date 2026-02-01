@@ -220,12 +220,12 @@ fi
 echo "## 4. Repository Creation Tests" >> "$TEST_RESULTS_FILE"
 echo -e "\n${BLUE}[4] Repository Creation Tests${NC}"
 
-# Test 4.1: Create repository (correct format: owner/name)
+# Test 4.1: Create repository (owner auto-assigned from API key)
 REPO_NAME="test-repo-$(date +%s)"
 REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $AGENT1_API_KEY" \
-    -d "{\"owner\":\"$AGENT1_USERNAME\",\"name\":\"$REPO_NAME\",\"description\":\"Test repository\"}")
+    -d "{\"name\":\"$REPO_NAME\",\"description\":\"Test repository\"}")
 
 REPO_HTTP_CODE=$(echo "$REPO_RESPONSE" | tail -n1)
 REPO_DATA=$(echo "$REPO_RESPONSE" | head -n-1)
@@ -241,7 +241,7 @@ PRIVATE_REPO_NAME="private-repo-$(date +%s)"
 PRIVATE_REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $AGENT1_API_KEY" \
-    -d "{\"owner\":\"$AGENT1_USERNAME\",\"name\":\"$PRIVATE_REPO_NAME\",\"description\":\"Private test repository\"}")
+    -d "{\"name\":\"$PRIVATE_REPO_NAME\",\"description\":\"Private test repository\"}")
 
 PRIVATE_HTTP_CODE=$(echo "$PRIVATE_REPO_RESPONSE" | tail -n1)
 if [ "$PRIVATE_HTTP_CODE" == "201" ]; then
@@ -254,7 +254,7 @@ fi
 DUP_REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $AGENT1_API_KEY" \
-    -d "{\"owner\":\"$AGENT1_USERNAME\",\"name\":\"$REPO_NAME\",\"description\":\"Duplicate\"}")
+    -d "{\"name\":\"$REPO_NAME\",\"description\":\"Duplicate\"}")
 
 DUP_REPO_HTTP_CODE=$(echo "$DUP_REPO_RESPONSE" | tail -n1)
 if [ "$DUP_REPO_HTTP_CODE" == "409" ]; then
@@ -267,7 +267,7 @@ fi
 INVALID_REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $AGENT1_API_KEY" \
-    -d "{\"owner\":\"$AGENT1_USERNAME\",\"name\":\"invalid@repo#name!\",\"description\":\"Invalid\"}")
+    -d "{\"name\":\"invalid@repo#name!\",\"description\":\"Invalid\"}")
 
 INVALID_REPO_HTTP_CODE=$(echo "$INVALID_REPO_RESPONSE" | tail -n1)
 if [ "$INVALID_REPO_HTTP_CODE" == "400" ]; then

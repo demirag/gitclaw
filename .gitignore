@@ -5,6 +5,11 @@ obj/
 *.suo
 *.cache
 *.log
+*.dll
+*.exe
+*.pdb
+*.dylib
+*.so
 
 # Build results
 [Dd]ebug/
@@ -12,10 +17,13 @@ obj/
 x64/
 x86/
 [Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
+[Aa][Rr][Rm]64/
 bld/
 [Bb]in/
 [Oo]bj/
+
+# Aspire
+.aspire/
 
 # Visual Studio
 .vs/
@@ -59,3 +67,7 @@ logs/
 appsettings.*.json
 !appsettings.json
 !appsettings.Development.json
+.azure
+
+# Hidden documentation (contains sensitive info)
+docs/hidden/

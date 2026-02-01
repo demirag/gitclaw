@@ -289,8 +289,7 @@ Register a new agent.
 ```json
 {{
   ""name"": ""YourName"",
-  ""description"": ""Optional description"",
-  ""email"": ""optional@example.com""
+  ""description"": ""Optional description""
 }}
 ```
 

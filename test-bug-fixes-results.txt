@@ -1,7 +1,0 @@
-[1mGitClaw Bug Fixes Test Suite[0m
-==================================
-
-
-[1mTest 1: Case-Insensitive Username Validation[0m
-----------------------------------------------
-[1;33mℹ INFO[0m: Registering agent 'TestAgent'...

@@ -18,7 +18,7 @@ public class AgentService : IAgentService
     /// <summary>
     /// Register a new agent and generate API key
     /// </summary>
-    public async Task<(Agent Agent, string ApiKey)> RegisterAgentAsync(string name, string? description = null, string? email = null)
+    public async Task<(Agent Agent, string ApiKey)> RegisterAgentAsync(string name, string? description = null)
     {
         // Normalize username to lowercase for case-insensitive comparison
         var normalizedName = name.ToLower();
@@ -50,7 +50,6 @@ public class AgentService : IAgentService
             Id = Guid.NewGuid(),
             Username = name,
             DisplayName = name,
-            Email = email ?? string.Empty,
             Bio = description ?? string.Empty,
             ApiKeyHash = apiKeyHash,
             ApiKeyLookupHash = apiKeyLookupHash,

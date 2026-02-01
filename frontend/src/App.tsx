@@ -7,6 +7,10 @@ import RepositoryList from './pages/RepositoryList';
 import RepositoryDetail from './pages/RepositoryDetail';
 import PullRequestList from './pages/PullRequestList';
 import PullRequestDetail from './pages/PullRequestDetail';
+import IssueList from './pages/IssueList';
+import IssueDetail from './pages/IssueDetail';
+import ReleaseList from './pages/ReleaseList';
+import ReleaseDetail from './pages/ReleaseDetail';
 import Profile from './pages/Profile';
 import { useEffect } from 'react';
 
@@ -49,6 +53,10 @@ function AppContent() {
         <Route path="/:owner/:repo" element={<RepositoryDetail />} />
         <Route path="/:owner/:repo/pulls" element={<PullRequestList />} />
         <Route path="/:owner/:repo/pull/:number" element={<PullRequestDetail />} />
+        <Route path="/:owner/:repo/issues" element={<IssueList />} />
+        <Route path="/:owner/:repo/issues/:number" element={<IssueDetail />} />
+        <Route path="/:owner/:repo/releases" element={<ReleaseList />} />
+        <Route path="/:owner/:repo/releases/tag/:tag" element={<ReleaseDetail />} />
         
         {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -17,6 +17,9 @@ public class GitClawDbContext : DbContext
     public DbSet<RepositoryStar> RepositoryStars => Set<RepositoryStar>();
     public DbSet<RepositoryWatch> RepositoryWatches => Set<RepositoryWatch>();
     public DbSet<RepositoryPin> RepositoryPins => Set<RepositoryPin>();
+    public DbSet<Issue> Issues => Set<Issue>();
+    public DbSet<IssueComment> IssueComments => Set<IssueComment>();
+    public DbSet<Release> Releases => Set<Release>();
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,9 +32,6 @@ public class GitClawDbContext : DbContext
             
             entity.Property(e => e.Username)
                 .IsRequired()
-                .HasMaxLength(255);
-            
-            entity.Property(e => e.Email)
                 .HasMaxLength(255);
             
             entity.Property(e => e.DisplayName)
@@ -270,6 +270,111 @@ public class GitClawDbContext : DbContext
             entity.HasOne(e => e.Reviewer)
                 .WithMany()
                 .HasForeignKey(e => e.ReviewerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // Issue configuration
+        modelBuilder.Entity<Issue>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Title)
+                .IsRequired()
+                .HasMaxLength(500);
+            
+            entity.Property(e => e.Body)
+                .HasMaxLength(10000);
+            
+            entity.Property(e => e.AuthorName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            // Indexes
+            entity.HasIndex(e => new { e.RepositoryId, e.Number }).IsUnique();
+            entity.HasIndex(e => e.Status);
+            entity.HasIndex(e => e.AuthorId);
+            
+            // Relationships
+            entity.HasOne(e => e.Repository)
+                .WithMany()
+                .HasForeignKey(e => e.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Author)
+                .WithMany()
+                .HasForeignKey(e => e.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.ClosedBy)
+                .WithMany()
+                .HasForeignKey(e => e.ClosedById)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+        
+        // IssueComment configuration
+        modelBuilder.Entity<IssueComment>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.Body)
+                .IsRequired()
+                .HasMaxLength(10000);
+            
+            entity.Property(e => e.AuthorName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            // Indexes
+            entity.HasIndex(e => e.IssueId);
+            entity.HasIndex(e => e.AuthorId);
+            
+            // Relationships
+            entity.HasOne(e => e.Issue)
+                .WithMany()
+                .HasForeignKey(e => e.IssueId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.Author)
+                .WithMany()
+                .HasForeignKey(e => e.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        
+        // Release configuration
+        modelBuilder.Entity<Release>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            
+            entity.Property(e => e.TagName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.Name)
+                .HasMaxLength(500);
+            
+            entity.Property(e => e.Body)
+                .HasMaxLength(10000);
+            
+            entity.Property(e => e.CreatedByName)
+                .IsRequired()
+                .HasMaxLength(255);
+            
+            entity.Property(e => e.TargetCommitish)
+                .HasMaxLength(255);
+            
+            // Indexes
+            entity.HasIndex(e => new { e.RepositoryId, e.TagName }).IsUnique();
+            entity.HasIndex(e => e.CreatedById);
+            
+            // Relationships
+            entity.HasOne(e => e.Repository)
+                .WithMany()
+                .HasForeignKey(e => e.RepositoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            
+            entity.HasOne(e => e.CreatedBy)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedById)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }
