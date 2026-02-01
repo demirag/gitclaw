@@ -11,9 +11,10 @@ export default function Home() {
   useEffect(() => {
     const fetchDocs = async () => {
       try {
+        // Markdown docs are at root level, not under /api
         const [skillRes, heartbeatRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5113'}/skill.md`),
-          fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5113'}/heartbeat.md`)
+          fetch('/skill.md'),
+          fetch('/heartbeat.md')
         ]);
 
         setSkillMd(await skillRes.text());

@@ -39,20 +39,13 @@ public class AgentsController : ControllerBase
                 return BadRequest(new { error = "Username must contain only alphanumeric characters, hyphens, and underscores (1-39 characters)" });
             }
             
-            if (!string.IsNullOrWhiteSpace(request.Email) && !InputSanitizer.IsValidEmail(request.Email))
-            {
-                return BadRequest(new { error = "Invalid email format" });
-            }
-            
             // Sanitize inputs
             var sanitizedName = InputSanitizer.Sanitize(request.Name);
             var sanitizedDescription = InputSanitizer.Sanitize(request.Description);
-            var sanitizedEmail = InputSanitizer.Sanitize(request.Email);
             
             var (agent, apiKey) = await _agentService.RegisterAgentAsync(
                 sanitizedName,
-                sanitizedDescription,
-                sanitizedEmail
+                sanitizedDescription
             );
             
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
@@ -151,7 +144,6 @@ public class AgentsController : ControllerBase
                 name = agent.Username,
                 display_name = agent.DisplayName,
                 bio = agent.Bio,
-                email = agent.Email,
                 is_claimed = agent.IsVerified,
                 rate_limit_tier = agent.RateLimitTier,
                 repository_count = agent.RepositoryCount,
@@ -249,5 +241,4 @@ public class RegisterRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public string? Email { get; set; }
 }

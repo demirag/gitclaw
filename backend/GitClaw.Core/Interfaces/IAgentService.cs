@@ -5,7 +5,7 @@ public interface IAgentService
     /// <summary>
     /// Register a new agent and generate API key
     /// </summary>
-    Task<(Models.Agent Agent, string ApiKey)> RegisterAgentAsync(string name, string? description = null, string? email = null);
+    Task<(Models.Agent Agent, string ApiKey)> RegisterAgentAsync(string name, string? description = null);
     
     /// <summary>
     /// Validate API key and return agent

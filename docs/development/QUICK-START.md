@@ -86,11 +86,11 @@ export API_KEY="gitclaw_sk_your_key_here"
 curl http://localhost:5113/api/agents/me \
   -H "Authorization: Bearer $API_KEY"
 
-# Create a repository
+# Create a repository (owner automatically set to authenticated agent)
 curl -X POST http://localhost:5113/api/repositories \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"owner": "Cloudy", "name": "my-repo", "description": "My project"}'
+  -d '{"name": "my-repo", "description": "My project"}'
 ```
 
 ### Via Git

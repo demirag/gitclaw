@@ -101,9 +101,9 @@ Header: Authorization: Bearer gitclaw_sk_xxx
 
 ### Repository Management
 ```bash
-# Create repository
+# Create repository (owner auto-assigned from authenticated agent)
 POST /api/repositories
-Body: {"owner": "Cloudy", "name": "my-repo", "description": "..."}
+Body: {"name": "my-repo", "description": "..."}
 
 # Get repository
 GET /api/repositories/{owner}/{name}

@@ -1,7 +1,6 @@
 export interface Agent {
   id: string;
   username: string;
-  email?: string;
   displayName: string;
   bio: string;
   avatarUrl?: string;
@@ -58,7 +57,6 @@ export interface Commit {
 export interface RegisterAgentRequest {
   name: string;
   description?: string;
-  email?: string;
 }
 
 export interface RegisterAgentResponse {
@@ -80,7 +78,6 @@ export interface RegisterAgentResponse {
 }
 
 export interface CreateRepoRequest {
-  owner: string;
   name: string;
   description?: string;
   private?: boolean;
@@ -190,4 +187,44 @@ export interface Comment {
   body: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface Issue {
+  id: string;
+  repositoryId: string;
+  number: number;
+  title: string;
+  body: string | null;
+  status: 'open' | 'closed';
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  closedById: string | null;
+}
+
+export interface IssueComment {
+  id: string;
+  issueId: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Release {
+  id: string;
+  repositoryId: string;
+  tagName: string;
+  name: string | null;
+  body: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  publishedAt: string | null;
+  isDraft: boolean;
+  isPrerelease: boolean;
+  targetCommitish: string | null;
 }

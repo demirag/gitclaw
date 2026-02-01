@@ -7,7 +7,7 @@ using GitClaw.Api.Utils;
 namespace GitClaw.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/repositories")]
 public class RepositoriesController : ControllerBase
 {
     private readonly IGitService _gitService;
@@ -95,7 +95,7 @@ public class RepositoriesController : ControllerBase
     /// <remarks>
     /// Creates a new git repository. Requires authentication.
     /// 
-    /// The owner should match your agent username for full permissions.
+    /// The repository will be owned by the authenticated agent.
     /// </remarks>
     [HttpPost]
     public async Task<IActionResult> CreateRepository([FromBody] CreateRepositoryRequest request)
@@ -104,8 +104,9 @@ public class RepositoriesController : ControllerBase
         {
             // Get authenticated agent
             var agentId = HttpContext.Items["AgentId"] as Guid?;
+            var agent = HttpContext.Items["Agent"] as Agent;
             
-            if (agentId == null)
+            if (agentId == null || agent == null)
             {
                 return Unauthorized(new { 
                     error = "Authentication required",
@@ -114,20 +115,11 @@ public class RepositoriesController : ControllerBase
             }
             
             // Validate request
-            if (string.IsNullOrWhiteSpace(request.Owner) || string.IsNullOrWhiteSpace(request.Name))
+            if (string.IsNullOrWhiteSpace(request.Name))
             {
                 return BadRequest(new { 
-                    error = "Owner and name are required",
-                    details = "Both 'owner' and 'name' fields must be provided in the request body"
-                });
-            }
-            
-            // Validate owner name
-            if (!InputSanitizer.IsValidUsername(request.Owner))
-            {
-                return BadRequest(new { 
-                    error = "Invalid owner name",
-                    details = "Owner must contain only alphanumeric characters, hyphens, and underscores (1-39 characters)"
+                    error = "Name is required",
+                    details = "The 'name' field must be provided in the request body"
                 });
             }
             
@@ -140,22 +132,24 @@ public class RepositoriesController : ControllerBase
                 });
             }
             
+            // Use authenticated agent's username as owner
+            var owner = agent.Username;
+            
             // Sanitize inputs
-            var sanitizedOwner = InputSanitizer.Sanitize(request.Owner);
             var sanitizedName = InputSanitizer.Sanitize(request.Name);
             var sanitizedDescription = InputSanitizer.Sanitize(request.Description);
             
             // Check if already exists
-            if (await _repositoryService.ExistsAsync(sanitizedOwner, sanitizedName))
+            if (await _repositoryService.ExistsAsync(owner, sanitizedName))
             {
                 return Conflict(new { 
                     error = "Repository already exists",
-                    details = $"A repository named '{sanitizedOwner}/{sanitizedName}' already exists"
+                    details = $"A repository named '{owner}/{sanitizedName}' already exists"
                 });
             }
             
             // Generate repository path
-            var repoPath = Path.Combine(RepositoryBasePath, sanitizedOwner, $"{sanitizedName}.git");
+            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{sanitizedName}.git");
             
             // Initialize git repository (this will create directories as needed)
             var success = await _gitService.InitializeRepositoryAsync(repoPath);
@@ -171,14 +165,14 @@ public class RepositoriesController : ControllerBase
             
             // Create database record
             var repository = await _repositoryService.CreateRepositoryAsync(
-                sanitizedOwner, 
+                owner, 
                 sanitizedName, 
                 sanitizedDescription,
                 agentId);
             
-            _logger.LogInformation("Created repository: {Owner}/{Name}", request.Owner, request.Name);
+            _logger.LogInformation("Created repository: {Owner}/{Name}", owner, sanitizedName);
             
-            return Created($"/api/repositories/{request.Owner}/{request.Name}", new
+            return Created($"/api/repositories/{owner}/{sanitizedName}", new
             {
                 id = repository.Id,
                 owner = repository.Owner,
@@ -204,7 +198,7 @@ public class RepositoriesController : ControllerBase
             return StatusCode(500, new { 
                 error = "Failed to create repository",
                 details = ex.Message,
-                hint = "Check that the owner name and repository name are valid"
+                hint = "Check that the repository name is valid"
             });
         }
     }
@@ -274,6 +268,10 @@ public class RepositoriesController : ControllerBase
     /// <summary>
     /// Update repository metadata
     /// </summary>
+    /// <remarks>
+    /// Updates repository metadata. Requires authentication.
+    /// Only the repository owner can update it.
+    /// </remarks>
     [HttpPatch("{owner}/{name}")]
     public async Task<IActionResult> UpdateRepository(
         string owner, 
@@ -282,6 +280,34 @@ public class RepositoriesController : ControllerBase
     {
         try
         {
+            // Get authenticated agent
+            var agentId = HttpContext.Items["AgentId"] as Guid?;
+            var agent = HttpContext.Items["Agent"] as Agent;
+            
+            if (agentId == null || agent == null)
+            {
+                return Unauthorized(new { 
+                    error = "Authentication required",
+                    details = "Include your API key in the Authorization header: Bearer YOUR_API_KEY"
+                });
+            }
+            
+            // Check if repository exists first
+            var existingRepo = await _repositoryService.GetRepositoryAsync(owner, name);
+            if (existingRepo == null)
+            {
+                return NotFound(new { error = "Repository not found" });
+            }
+            
+            // Authorization check: Only the owner can update the repository
+            if (existingRepo.Owner != agent.Username)
+            {
+                return StatusCode(403, new { 
+                    error = "Forbidden",
+                    details = "You do not have permission to update this repository"
+                });
+            }
+            
             // Sanitize inputs
             var sanitizedDescription = InputSanitizer.Sanitize(request.Description);
             
@@ -319,16 +345,41 @@ public class RepositoriesController : ControllerBase
     /// <summary>
     /// Delete repository
     /// </summary>
+    /// <remarks>
+    /// Deletes a repository. Requires authentication.
+    /// Only the repository owner can delete it.
+    /// </remarks>
     [HttpDelete("{owner}/{name}")]
     public async Task<IActionResult> DeleteRepository(string owner, string name)
     {
         try
         {
+            // Get authenticated agent
+            var agentId = HttpContext.Items["AgentId"] as Guid?;
+            var agent = HttpContext.Items["Agent"] as Agent;
+            
+            if (agentId == null || agent == null)
+            {
+                return Unauthorized(new { 
+                    error = "Authentication required",
+                    details = "Include your API key in the Authorization header: Bearer YOUR_API_KEY"
+                });
+            }
+            
             // Check if exists in database
             var repository = await _repositoryService.GetRepositoryAsync(owner, name);
             if (repository == null)
             {
                 return NotFound(new { error = "Repository not found" });
+            }
+            
+            // Authorization check: Only the owner can delete the repository
+            if (repository.Owner != agent.Username)
+            {
+                return StatusCode(403, new { 
+                    error = "Forbidden",
+                    details = "You do not have permission to delete this repository"
+                });
             }
             
             // Delete from database
@@ -814,5 +865,5 @@ public class RepositoriesController : ControllerBase
     }
 }
 
-public record CreateRepositoryRequest(string Owner, string Name, string? Description = null);
+public record CreateRepositoryRequest(string Name, string? Description = null);
 public record UpdateRepositoryRequest(string? Description = null, bool? IsPrivate = null);

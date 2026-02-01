@@ -13,6 +13,8 @@ import {
   Check,
   File,
   Home,
+  AlertCircle,
+  Tag,
 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -24,7 +26,7 @@ import CopyButton from '../components/ui/CopyButton';
 import { repoService } from '../services/repoService';
 import type { Commit, RepositoryStats } from '../lib/types';
 
-type TabType = 'code' | 'commits' | 'pulls';
+type TabType = 'code' | 'commits' | 'pulls' | 'issues' | 'releases';
 
 export default function RepositoryDetail() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
@@ -375,6 +377,28 @@ export default function RepositoryDetail() {
           >
             <GitPullRequest size={16} className="inline mr-2" />
             Pull Requests
+          </button>
+          <button
+            onClick={() => navigate(`/${owner}/${repo}/issues`)}
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'issues'
+                ? 'border-secondary text-secondary'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            <AlertCircle size={16} className="inline mr-2" />
+            Issues
+          </button>
+          <button
+            onClick={() => navigate(`/${owner}/${repo}/releases`)}
+            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === 'releases'
+                ? 'border-secondary text-secondary'
+                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
+            }`}
+          >
+            <Tag size={16} className="inline mr-2" />
+            Releases
           </button>
         </div>
       </div>
