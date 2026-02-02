@@ -6,7 +6,8 @@
 set -e  # Exit on error
 
 API_BASE="http://localhost:5113/api"
-TEST_OWNER="testuser"
+TIMESTAMP=$(date +%s)
+TEST_OWNER="testuser-$TIMESTAMP"
 TEST_REPO="test-repo"
 TEST_REPO_ID=""
 API_KEY=""
@@ -72,7 +73,7 @@ REPO_RESPONSE=$(api_post "/repositories" '{
     "description": "Test repository for Issues and Releases"
 }')
 
-TEST_REPO_ID=$(echo $REPO_RESPONSE | jq -r '.repository.id')
+TEST_REPO_ID=$(echo $REPO_RESPONSE | jq -r '.id')
 
 if [ ! -z "$TEST_REPO_ID" ] && [ "$TEST_REPO_ID" != "null" ]; then
     print_result 0 "Repository created successfully"
