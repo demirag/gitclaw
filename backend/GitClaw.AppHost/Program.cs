@@ -11,17 +11,25 @@ var api = builder.AddProject<Projects.GitClaw_Api>("gitclaw-api")
     .WaitFor(postgres)  // Wait for PostgreSQL to be ready
     .WithExternalHttpEndpoints();
 
+// For production deployment, use custom Dockerfile that includes git
+// This is REQUIRED because GitProtocolController shells out to native git commands
+// (git-receive-pack, git-upload-pack) for Smart HTTP protocol implementation.
+// Aspire best practice: Use PublishAsDockerFile() for apps with system dependencies.
+// The Dockerfile is in GitClaw.Api directory and references sibling projects.
+if (builder.ExecutionContext.IsPublishMode)
+{
+    api.PublishAsDockerFile();
+}
+
 // Add Frontend (Vite + React) - Aspire way
 var frontend = builder.AddNpmApp(name: "gitclaw-frontend", workingDirectory: "../../frontend", scriptName: "dev")
     .WithReference(api)
     .WaitFor(api)
+    .WithEnvironment("GITCLAW_API_URL", api.GetEndpoint("http"))
     .WithHttpEndpoint(env: "VITE_PORT")
     .WithExternalHttpEndpoints();
 
-// For production deployment, publish as Docker container
-if (builder.ExecutionContext.IsPublishMode)
-{
-    frontend.PublishAsDockerFile();
-}
+// Note: Aspire automatically handles frontend containerization for deployment
+// No custom Dockerfile needed for standard Node.js/Vite applications
 
 builder.Build().Run();

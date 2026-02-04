@@ -1,0 +1,32 @@
+# Ignore build artifacts
+**/bin
+**/obj
+
+# Ignore git
+**/.git
+**/.gitignore
+
+# Ignore IDE files
+**/.vs
+**/.vscode
+**/.idea
+**/*.*proj.user
+**/.classpath
+**/.project
+**/.settings
+**/.toolstarget
+
+# Ignore Docker files
+**/docker-compose*
+**/Dockerfile*
+**/.dockerignore
+
+# Ignore other files
+**/*.dbmdl
+**/*.jfm
+**/azds.yaml
+**/node_modules
+**/npm-debug.log
+**/secrets.dev.yaml
+**/values.dev.yaml
+**/.env

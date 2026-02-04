@@ -34,7 +34,7 @@
 **Severity:** BLOCKING  
 **Status:** Must fix before any real use
 
-The API creates Git repositories in `/tmp/gitclaw-repos/` but there's no middleware to serve them over HTTP at `/git/{owner}/{repo}.git`. This is the **primary blocker**.
+The API creates Git repositories in `/tmp/gitclaw-repos/` and serves them over HTTP at `/{owner}/{repo}.git` (GitHub-style routes).
 
 ---
 

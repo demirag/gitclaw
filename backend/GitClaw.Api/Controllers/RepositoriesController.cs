@@ -14,6 +14,7 @@ public class RepositoriesController : ControllerBase
     private readonly IRepositoryService _repositoryService;
     private readonly ILogger<RepositoriesController> _logger;
     private const string RepositoryBasePath = "/tmp/gitclaw-repos"; // TODO: Make configurable
+    private const int MaxDescriptionLength = 1000; // Matches Repository.Description in DbContext
     
     public RepositoriesController(
         IGitService gitService, 
@@ -129,6 +130,16 @@ public class RepositoriesController : ControllerBase
                 return BadRequest(new { 
                     error = "Invalid repository name",
                     details = "Repository name must contain only alphanumeric characters, hyphens, and underscores (1-100 characters)"
+                });
+            }
+            
+            // Reject oversized description (avoids DB exception and acts as payload size limit)
+            if (request.Description != null && request.Description.Length > MaxDescriptionLength)
+            {
+                return BadRequest(new { 
+                    error = "Description too long",
+                    details = $"Description must be at most {MaxDescriptionLength} characters.",
+                    maxLength = MaxDescriptionLength
                 });
             }
             

@@ -7,8 +7,10 @@ namespace GitClaw.Api.Controllers;
 /// <summary>
 /// Git HTTP Smart Protocol implementation
 /// Handles git clone, push, pull over HTTP
+/// GitHub-style routes: /{owner}/{repo}.git
 /// </summary>
 [ApiController]
+[Route("{owner}/{repo}.git")]
 public class GitHttpController : ControllerBase
 {
     private readonly IAgentService _agentService;
@@ -28,8 +30,9 @@ public class GitHttpController : ControllerBase
     
     /// <summary>
     /// Git info/refs endpoint (for git clone/fetch and git push)
+    /// Route: GET /{owner}/{repo}.git/info/refs?service=git-upload-pack
     /// </summary>
-    [HttpGet("{owner}/{repo}/info/refs")]
+    [HttpGet("info/refs")]
     public async Task<IActionResult> GetInfoRefs(string owner, string repo, [FromQuery] string service)
     {
         try
@@ -113,8 +116,9 @@ public class GitHttpController : ControllerBase
     
     /// <summary>
     /// Git upload-pack endpoint (for git clone/fetch)
+    /// Route: POST /{owner}/{repo}.git/git-upload-pack
     /// </summary>
-    [HttpPost("{owner}/{repo}/git-upload-pack")]
+    [HttpPost("git-upload-pack")]
     public async Task<IActionResult> PostUploadPack(string owner, string repo)
     {
         return await ExecuteGitService(owner, repo, "git-upload-pack");
@@ -122,8 +126,9 @@ public class GitHttpController : ControllerBase
     
     /// <summary>
     /// Git receive-pack endpoint (for git push)
+    /// Route: POST /{owner}/{repo}.git/git-receive-pack
     /// </summary>
-    [HttpPost("{owner}/{repo}/git-receive-pack")]
+    [HttpPost("git-receive-pack")]
     public async Task<IActionResult> PostReceivePack(string owner, string repo)
     {
         return await ExecuteGitService(owner, repo, "git-receive-pack");

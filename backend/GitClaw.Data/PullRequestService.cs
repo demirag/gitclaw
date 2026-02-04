@@ -134,6 +134,11 @@ public class PullRequestService : IPullRequestService
         
         // Perform git merge using worktree (bare repos require worktree for merge)
         var bareRepoPath = Path.Combine(RepositoryBasePath, owner, $"{repositoryName}.git");
+        if (!Directory.Exists(bareRepoPath))
+        {
+            return (false, $"Repository path not found: {bareRepoPath}");
+        }
+        
         var worktreePath = Path.Combine(Path.GetTempPath(), $"gitclaw-merge-{Guid.NewGuid()}");
         
         try
@@ -144,14 +149,25 @@ public class PullRequestService : IPullRequestService
             
             if (!addWorktreeResult.Success)
             {
-                return (false, $"Failed to create worktree: {addWorktreeResult.Error}");
+                var err = CombineGitOutput(addWorktreeResult.Output, addWorktreeResult.Error);
+                return (false, $"Failed to create worktree for branch '{pullRequest.TargetBranch}'. Ensure the branch exists (e.g. push to origin {pullRequest.TargetBranch}). {err}");
             }
             
             try
             {
-                // Step 2: Merge the source branch in the worktree
+                // Step 2: Resolve source branch to a commit SHA in the bare repo (worktree shares refs with bare)
+                var revParseSource = await RunGitCommandAsync(bareRepoPath, 
+                    $"rev-parse refs/heads/{pullRequest.SourceBranch}");
+                if (!revParseSource.Success || string.IsNullOrWhiteSpace(revParseSource.Output))
+                {
+                    var err = CombineGitOutput(revParseSource.Output, revParseSource.Error);
+                    return (false, $"Source branch '{pullRequest.SourceBranch}' not found or has no commits. {err}");
+                }
+                var sourceCommitSha = revParseSource.Output.Trim();
+                
+                // Step 3: Merge the source commit into the worktree (checked out to target branch)
                 var mergeResult = await RunGitCommandAsync(worktreePath, 
-                    $"merge --no-ff -m \"Merge pull request #{number}: {pullRequest.Title}\" origin/{pullRequest.SourceBranch}");
+                    $"merge --no-ff -m \"Merge pull request #{number}: {pullRequest.Title}\" {sourceCommitSha}");
                 
                 if (!mergeResult.Success)
                 {
@@ -168,25 +184,26 @@ public class PullRequestService : IPullRequestService
                         return (false, "Merge conflicts detected. Please resolve conflicts manually.");
                     }
                     
-                    return (false, $"Merge failed: {mergeResult.Error}");
+                    var mergeErr = CombineGitOutput(mergeResult.Output, mergeResult.Error);
+                    return (false, $"Merge failed: {mergeErr}");
                 }
                 
-                // Step 3: Push the merged changes back to the bare repo
-                // The worktree's origin is already the bare repo, so we need to update the branch ref
-                var updateRefResult = await RunGitCommandAsync(worktreePath, 
-                    $"push . HEAD:{pullRequest.TargetBranch}");
+                // Step 4: Push the merged changes back to the bare repo
+                var revParseHead = await RunGitCommandAsync(worktreePath, "rev-parse HEAD");
+                if (!revParseHead.Success || string.IsNullOrWhiteSpace(revParseHead.Output))
+                {
+                    return (false, "Failed to get merge commit SHA.");
+                }
+                var mergeCommitSha = revParseHead.Output.Trim();
                 
-                // For worktrees, we update directly via the ref
+                // Update the target branch ref in the bare repo to point to the merge commit
+                var updateRefResult = await RunGitCommandAsync(bareRepoPath, 
+                    $"update-ref refs/heads/{pullRequest.TargetBranch} {mergeCommitSha}");
+                
                 if (!updateRefResult.Success)
                 {
-                    // Alternative: get the commit SHA and update ref directly
-                    var revParseResult = await RunGitCommandAsync(worktreePath, "rev-parse HEAD");
-                    if (revParseResult.Success && !string.IsNullOrEmpty(revParseResult.Output))
-                    {
-                        var commitSha = revParseResult.Output.Trim();
-                        await RunGitCommandAsync(bareRepoPath, 
-                            $"update-ref refs/heads/{pullRequest.TargetBranch} {commitSha}");
-                    }
+                    var err = CombineGitOutput(updateRefResult.Output, updateRefResult.Error);
+                    return (false, $"Failed to update branch {pullRequest.TargetBranch}: {err}");
                 }
                 
                 // Update pull request
@@ -226,6 +243,15 @@ public class PullRequestService : IPullRequestService
             }
             return (false, $"Merge error: {ex.Message}");
         }
+    }
+    
+    /// <summary>
+    /// Combine git stdout and stderr for error messages (either may contain the real message).
+    /// </summary>
+    private static string CombineGitOutput(string? output, string? error)
+    {
+        var parts = new[] { output?.Trim(), error?.Trim() }.Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+        return parts.Count == 0 ? "" : string.Join(" ", parts);
     }
     
     /// <summary>

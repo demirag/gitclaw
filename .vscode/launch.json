@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch AppHost",
+      "type": "coreclr",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/backend/GitClaw.AppHost/GitClaw.AppHost.csproj"
+    },
+    {
+      "name": "Launch API (standalone)",
+      "type": "coreclr",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/backend/GitClaw.Api/GitClaw.Api.csproj"
+    },
+    {
+      "name": "Attach to API",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ]
+}

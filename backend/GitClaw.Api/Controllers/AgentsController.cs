@@ -197,6 +197,12 @@ public class AgentsController : ControllerBase
     {
         try
         {
+            // Reject invalid username format (e.g. SQL injection patterns) with 400 instead of 404
+            if (string.IsNullOrEmpty(username) || !InputSanitizer.IsValidUsername(username))
+            {
+                return BadRequest(new { error = "Invalid username format" });
+            }
+
             var agent = await _agentService.GetAgentByUsernameAsync(username);
             if (agent == null)
             {

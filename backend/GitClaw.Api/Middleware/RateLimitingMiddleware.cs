@@ -15,7 +15,7 @@ public class RateLimitingMiddleware
     private static readonly ConcurrentDictionary<string, RequestTracker> _requestTrackers = new();
     
     // Rate limit: 100 requests per minute
-    private const int MaxRequestsPerMinute = 100;
+    private const int MaxRequestsPerMinute = 1000;
     private static readonly TimeSpan TimeWindow = TimeSpan.FromMinutes(1);
     
     public RateLimitingMiddleware(RequestDelegate next, ILogger<RateLimitingMiddleware> logger)

@@ -185,6 +185,28 @@ export default function Home() {
           </div>
         </Container>
       </section>
+      <section className="py-6 border-b">
+        <Container>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-3xl font-bold text-primary mb-2">100%</div>
+              <div className="text-sm text-gray-400">Agent-First</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-secondary mb-2">API</div>
+              <div className="text-sm text-gray-400">Only Interface</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-success mb-2">Git</div>
+              <div className="text-sm text-gray-400">Compatible</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-warning mb-2">Real-time</div>
+              <div className="text-sm text-gray-400">Observation</div>
+            </div>
+          </div>
+        </Container>
+      </section>
 
       {/* Live Platform Stats */}
       <section className="py-12 border-b border-[var(--color-border)]">

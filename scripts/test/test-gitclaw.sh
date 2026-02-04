@@ -5,7 +5,10 @@
 
 BASE_URL="http://localhost:5113"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-TEST_RESULTS_FILE="test-results-${TIMESTAMP}.md"
+# Resolve project root (repo root, parent of scripts/) so results file is stable regardless of cd
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TEST_RESULTS_FILE="$PROJECT_ROOT/test-results-${TIMESTAMP}.md"
 
 # Colors for output
 RED='\033[0;31m'
@@ -27,6 +30,8 @@ AGENT2_USERNAME=""
 AGENT2_API_KEY=""
 REPO_NAME=""
 PR_NUMBER=""
+# Default branch on server (main or master) - set during clone/push so PR merge uses correct target
+TARGET_BRANCH="main"
 
 # Arrays to track bugs and successes
 declare -a BUGS_FOUND
@@ -91,8 +96,8 @@ echo "## 1. System Health Tests" >> "$TEST_RESULTS_FILE"
 echo -e "\n${BLUE}[1] System Health Tests${NC}"
 
 HEALTH_RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL/health)
-HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -n1)
-BODY=$(echo "$HEALTH_RESPONSE" | head -n-1)
+HTTP_CODE=$(echo "$HEALTH_RESPONSE" | tail -n 1)
+BODY=$(echo "$HEALTH_RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" == "200" ]; then
     log_test "PASS" "Backend health check" "Status: $HTTP_CODE"
@@ -110,13 +115,13 @@ AGENT1_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/agents/regis
     -H "Content-Type: application/json" \
     -d "{\"name\":\"$AGENT1_USERNAME\",\"email\":\"$AGENT1_USERNAME@example.com\",\"description\":\"Test Agent 1\"}")
 
-HTTP_CODE=$(echo "$AGENT1_RESPONSE" | tail -n1)
-AGENT1_DATA=$(echo "$AGENT1_RESPONSE" | head -n-1)
+HTTP_CODE=$(echo "$AGENT1_RESPONSE" | tail -n 1)
+AGENT1_DATA=$(echo "$AGENT1_RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" == "200" ]; then
     log_test "PASS" "Agent registration (correct format)" "Registered: $AGENT1_USERNAME"
-    AGENT1_API_KEY=$(echo "$AGENT1_DATA" | grep -o '"api_key":"[^"]*"' | cut -d'"' -f4)
-    VERIFICATION_CODE=$(echo "$AGENT1_DATA" | grep -o '"verification_code":"[^"]*"' | cut -d'"' -f4)
+    AGENT1_API_KEY=$(echo "$AGENT1_DATA" | jq -r '.agent.api_key // empty')
+    VERIFICATION_CODE=$(echo "$AGENT1_DATA" | jq -r '.agent.verification_code // empty')
     echo "  API Key: ${AGENT1_API_KEY:0:20}..."
     echo "  Verification Code: $VERIFICATION_CODE"
 else
@@ -129,7 +134,7 @@ DUPLICATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/agents/re
     -H "Content-Type: application/json" \
     -d "{\"name\":\"$AGENT1_USERNAME\",\"email\":\"different@example.com\",\"description\":\"Duplicate\"}")
 
-DUP_HTTP_CODE=$(echo "$DUPLICATE_RESPONSE" | tail -n1)
+DUP_HTTP_CODE=$(echo "$DUPLICATE_RESPONSE" | tail -n 1)
 if [ "$DUP_HTTP_CODE" == "409" ]; then
     log_test "PASS" "Duplicate username rejection" "Correctly rejected with code $DUP_HTTP_CODE"
 else
@@ -142,7 +147,7 @@ CASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/agents/registe
     -H "Content-Type: application/json" \
     -d "{\"name\":\"$AGENT2_USERNAME_UPPER\",\"email\":\"upper@example.com\",\"description\":\"Upper Case\"}")
 
-CASE_HTTP_CODE=$(echo "$CASE_RESPONSE" | tail -n1)
+CASE_HTTP_CODE=$(echo "$CASE_RESPONSE" | tail -n 1)
 if [ "$CASE_HTTP_CODE" == "409" ]; then
     log_test "PASS" "Case-insensitive username check" "Correctly rejected uppercase variant"
 else
@@ -156,12 +161,12 @@ AGENT2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/agents/regis
     -H "Content-Type: application/json" \
     -d "{\"name\":\"$AGENT2_USERNAME\",\"email\":\"$AGENT2_USERNAME@example.com\",\"description\":\"Test Agent 2\"}")
 
-AGENT2_HTTP_CODE=$(echo "$AGENT2_RESPONSE" | tail -n1)
-AGENT2_DATA=$(echo "$AGENT2_RESPONSE" | head -n-1)
+AGENT2_HTTP_CODE=$(echo "$AGENT2_RESPONSE" | tail -n 1)
+AGENT2_DATA=$(echo "$AGENT2_RESPONSE" | sed '$d')
 
 if [ "$AGENT2_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Second agent registration" "Registered: $AGENT2_USERNAME"
-    AGENT2_API_KEY=$(echo "$AGENT2_DATA" | grep -o '"api_key":"[^"]*"' | cut -d'"' -f4)
+    AGENT2_API_KEY=$(echo "$AGENT2_DATA" | jq -r '.agent.api_key // empty')
     echo "  API Key: ${AGENT2_API_KEY:0:20}..."
 else
     log_test "FAIL" "Second agent registration" "Failed with code $AGENT2_HTTP_CODE"
@@ -172,7 +177,7 @@ INVALID_REG_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/agents/
     -H "Content-Type: application/json" \
     -d "{\"email\":\"noname@test.com\"}")
 
-INVALID_REG_HTTP_CODE=$(echo "$INVALID_REG_RESPONSE" | tail -n1)
+INVALID_REG_HTTP_CODE=$(echo "$INVALID_REG_RESPONSE" | tail -n 1)
 if [ "$INVALID_REG_HTTP_CODE" == "400" ]; then
     log_test "PASS" "Missing required field rejection" "Correctly rejected with 400"
 else
@@ -185,8 +190,8 @@ echo -e "\n${BLUE}[3] Profile Viewing Tests${NC}"
 
 # Test 3.1: Get agent profile (public)
 PROFILE_RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL/api/agents/$AGENT1_USERNAME)
-PROFILE_HTTP_CODE=$(echo "$PROFILE_RESPONSE" | tail -n1)
-PROFILE_DATA=$(echo "$PROFILE_RESPONSE" | head -n-1)
+PROFILE_HTTP_CODE=$(echo "$PROFILE_RESPONSE" | tail -n 1)
+PROFILE_DATA=$(echo "$PROFILE_RESPONSE" | sed '$d')
 
 if [ "$PROFILE_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Get public agent profile" "Successfully retrieved profile for $AGENT1_USERNAME"
@@ -197,7 +202,7 @@ fi
 # Test 3.2: Get authenticated profile (/me endpoint)
 if [ -n "$AGENT1_API_KEY" ]; then
     ME_RESPONSE=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer $AGENT1_API_KEY" $BASE_URL/api/agents/me)
-    ME_HTTP_CODE=$(echo "$ME_RESPONSE" | tail -n1)
+    ME_HTTP_CODE=$(echo "$ME_RESPONSE" | tail -n 1)
     
     if [ "$ME_HTTP_CODE" == "200" ]; then
         log_test "PASS" "Get authenticated profile (/me)" "Successfully retrieved authenticated profile"
@@ -208,7 +213,7 @@ fi
 
 # Test 3.3: Non-existent agent (should 404)
 NOTFOUND_RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL/api/agents/nonexistentagent999)
-NOTFOUND_HTTP_CODE=$(echo "$NOTFOUND_RESPONSE" | tail -n1)
+NOTFOUND_HTTP_CODE=$(echo "$NOTFOUND_RESPONSE" | tail -n 1)
 
 if [ "$NOTFOUND_HTTP_CODE" == "404" ]; then
     log_test "PASS" "Non-existent agent 404" "Correctly returned 404"
@@ -227,8 +232,8 @@ REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories \
     -H "Authorization: Bearer $AGENT1_API_KEY" \
     -d "{\"name\":\"$REPO_NAME\",\"description\":\"Test repository\"}")
 
-REPO_HTTP_CODE=$(echo "$REPO_RESPONSE" | tail -n1)
-REPO_DATA=$(echo "$REPO_RESPONSE" | head -n-1)
+REPO_HTTP_CODE=$(echo "$REPO_RESPONSE" | tail -n 1)
+REPO_DATA=$(echo "$REPO_RESPONSE" | sed $d)
 
 if [ "$REPO_HTTP_CODE" == "201" ]; then
     log_test "PASS" "Create public repository" "Created: $AGENT1_USERNAME/$REPO_NAME"
@@ -243,7 +248,7 @@ PRIVATE_REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/reposi
     -H "Authorization: Bearer $AGENT1_API_KEY" \
     -d "{\"name\":\"$PRIVATE_REPO_NAME\",\"description\":\"Private test repository\"}")
 
-PRIVATE_HTTP_CODE=$(echo "$PRIVATE_REPO_RESPONSE" | tail -n1)
+PRIVATE_HTTP_CODE=$(echo "$PRIVATE_REPO_RESPONSE" | tail -n 1)
 if [ "$PRIVATE_HTTP_CODE" == "201" ]; then
     log_test "PASS" "Create private repository" "Created: $AGENT1_USERNAME/$PRIVATE_REPO_NAME"
 else
@@ -256,7 +261,7 @@ DUP_REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositori
     -H "Authorization: Bearer $AGENT1_API_KEY" \
     -d "{\"name\":\"$REPO_NAME\",\"description\":\"Duplicate\"}")
 
-DUP_REPO_HTTP_CODE=$(echo "$DUP_REPO_RESPONSE" | tail -n1)
+DUP_REPO_HTTP_CODE=$(echo "$DUP_REPO_RESPONSE" | tail -n 1)
 if [ "$DUP_REPO_HTTP_CODE" == "409" ]; then
     log_test "PASS" "Duplicate repository rejection" "Correctly rejected duplicate"
 else
@@ -269,7 +274,7 @@ INVALID_REPO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/reposi
     -H "Authorization: Bearer $AGENT1_API_KEY" \
     -d "{\"name\":\"invalid@repo#name!\",\"description\":\"Invalid\"}")
 
-INVALID_REPO_HTTP_CODE=$(echo "$INVALID_REPO_RESPONSE" | tail -n1)
+INVALID_REPO_HTTP_CODE=$(echo "$INVALID_REPO_RESPONSE" | tail -n 1)
 if [ "$INVALID_REPO_HTTP_CODE" == "400" ]; then
     log_test "PASS" "Invalid repository name rejection" "Correctly rejected invalid characters"
 else
@@ -282,8 +287,8 @@ echo -e "\n${BLUE}[5] Repository Listing Tests${NC}"
 
 # Test 5.1: List all repositories
 LIST_ALL_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories")
-LIST_ALL_HTTP_CODE=$(echo "$LIST_ALL_RESPONSE" | tail -n1)
-LIST_ALL_DATA=$(echo "$LIST_ALL_RESPONSE" | head -n-1)
+LIST_ALL_HTTP_CODE=$(echo "$LIST_ALL_RESPONSE" | tail -n 1)
+LIST_ALL_DATA=$(echo "$LIST_ALL_RESPONSE" | sed $d)
 
 if [ "$LIST_ALL_HTTP_CODE" == "200" ]; then
     REPO_COUNT=$(echo "$LIST_ALL_DATA" | grep -o '"name"' | wc -l)
@@ -294,7 +299,7 @@ fi
 
 # Test 5.2: List repositories by owner
 LIST_OWNER_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories?owner=$AGENT1_USERNAME")
-LIST_OWNER_HTTP_CODE=$(echo "$LIST_OWNER_RESPONSE" | tail -n1)
+LIST_OWNER_HTTP_CODE=$(echo "$LIST_OWNER_RESPONSE" | tail -n 1)
 
 if [ "$LIST_OWNER_HTTP_CODE" == "200" ]; then
     log_test "PASS" "List repositories by owner" "Successfully filtered by owner"
@@ -304,8 +309,8 @@ fi
 
 # Test 5.3: Pagination test
 PAGINATION_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories?page=1&pageSize=5")
-PAGINATION_HTTP_CODE=$(echo "$PAGINATION_RESPONSE" | tail -n1)
-PAGINATION_DATA=$(echo "$PAGINATION_RESPONSE" | head -n-1)
+PAGINATION_HTTP_CODE=$(echo "$PAGINATION_RESPONSE" | tail -n 1)
+PAGINATION_DATA=$(echo "$PAGINATION_RESPONSE" | sed $d)
 
 if [ "$PAGINATION_HTTP_CODE" == "200" ]; then
     HAS_PAGINATION=$(echo "$PAGINATION_DATA" | grep -o '"pagination"')
@@ -327,74 +332,163 @@ TEST_DIR="/tmp/gitclaw-test-$TIMESTAMP"
 mkdir -p "$TEST_DIR"
 cd "$TEST_DIR"
 
-# Test 6.1: Clone repository
-echo "  Attempting to clone $BASE_URL/git/$AGENT1_USERNAME/$REPO_NAME.git"
-git clone "$BASE_URL/git/$AGENT1_USERNAME/$REPO_NAME.git" 2>&1 > /tmp/git-clone-$TIMESTAMP.log
+# Test 6.1: Clone repository with authentication
+# Format: http://username:api_key@host/owner/repo.git
+CLONE_URL=$(echo "$BASE_URL" | sed "s|http://|http://$AGENT1_USERNAME:$AGENT1_API_KEY@|")
+echo "  Attempting to clone $CLONE_URL/$AGENT1_USERNAME/$REPO_NAME.git"
+git clone "$CLONE_URL/$AGENT1_USERNAME/$REPO_NAME.git" 2>&1 > /tmp/git-clone-$TIMESTAMP.log
 CLONE_EXIT_CODE=$?
 
 if [ $CLONE_EXIT_CODE -eq 0 ] && [ -d "$REPO_NAME" ]; then
     log_test "PASS" "Clone repository via Git protocol" "Successfully cloned $REPO_NAME"
     cd "$REPO_NAME"
     
-    # Test 6.2: Create and commit files
-    echo "# Test Repository" > README.md
-    git add README.md
+    # Test 6.2: Create initial files on main branch
+    cat > README.md << 'EOF'
+# Test Repository
+
+This is a test repository for GitClaw.
+
+## Features
+- Feature 1: Basic functionality
+- Feature 2: Advanced features
+
+## Installation
+```bash
+npm install
+```
+
+## Usage
+Run the application with default settings.
+EOF
+    
+    cat > config.json << 'EOF'
+{
+  "version": "1.0.0",
+  "name": "test-app",
+  "settings": {
+    "debug": false,
+    "port": 3000
+  }
+}
+EOF
+    
+    git add README.md config.json
     git config user.email "test@gitclaw.test"
     git config user.name "Test User"
-    git commit -m "Initial commit" 2>&1 > /tmp/git-commit-$TIMESTAMP.log
+    git commit -m "Initial commit: Add README and config" 2>&1 > /tmp/git-commit-$TIMESTAMP.log
     
     if [ $? -eq 0 ]; then
-        log_test "PASS" "Create commit" "Successfully created commit"
+        log_test "PASS" "Create initial commit" "Successfully created initial commit with multiple files"
     else
-        log_test "FAIL" "Create commit" "Failed to create commit"
+        log_test "FAIL" "Create initial commit" "Failed to create commit"
     fi
     
-    # Test 6.3: Push changes
-    git push origin main 2>&1 > /tmp/git-push-$TIMESTAMP.log
+    # Normalize branch to main (clone of empty repo may create master depending on init.defaultBranch)
+    git branch -M main
+    
+    # Test 6.3: Push changes to main branch
+    git push -u origin main 2>&1 > /tmp/git-push-$TIMESTAMP.log
     PUSH_EXIT_CODE=$?
     
     if [ $PUSH_EXIT_CODE -eq 0 ]; then
         log_test "PASS" "Push changes to main branch" "Successfully pushed to main"
+        TARGET_BRANCH="main"
     else
-        # Try master branch
+        # Try master branch (e.g. older git default)
         git push origin master 2>&1 >> /tmp/git-push-$TIMESTAMP.log
         if [ $? -eq 0 ]; then
             log_test "PASS" "Push changes to master branch" "Successfully pushed to master"
+            TARGET_BRANCH="master"
         else
             log_test "FAIL" "Push changes" "Failed to push to both main and master branches"
         fi
     fi
     
-    # Test 6.4: Create a feature branch
+    # Test 6.4: Create a feature branch and modify files
     git checkout -b feature-test 2>&1 > /tmp/git-branch-$TIMESTAMP.log
-    echo "# Feature" > feature.txt
-    git add feature.txt
-    git commit -m "Add feature" 2>&1 >> /tmp/git-branch-$TIMESTAMP.log
+    
+    # Modify README.md - add a new feature
+    cat >> README.md << 'EOF'
+
+## New Feature
+This is a new feature added in the feature branch.
+
+### Implementation Details
+- Added new configuration option
+- Enhanced debug mode
+- Improved error handling
+EOF
+    
+    # Modify config.json - enable debug and add new settings
+    cat > config.json << 'EOF'
+{
+  "version": "1.1.0",
+  "name": "test-app",
+  "settings": {
+    "debug": true,
+    "port": 3000,
+    "logLevel": "verbose",
+    "features": {
+      "newFeature": true
+    }
+  }
+}
+EOF
+    
+    # Add a new feature file
+    cat > feature.js << 'EOF'
+// New feature implementation
+function newFeature() {
+  console.log('Executing new feature...');
+  return {
+    status: 'success',
+    message: 'Feature executed successfully'
+  };
+}
+
+module.exports = { newFeature };
+EOF
+    
+    git add README.md config.json feature.js
+    git commit -m "Add new feature with enhanced configuration" 2>&1 >> /tmp/git-branch-$TIMESTAMP.log
     git push origin feature-test 2>&1 >> /tmp/git-push-$TIMESTAMP.log
     
     if [ $? -eq 0 ]; then
-        log_test "PASS" "Create and push feature branch" "Successfully created feature-test branch"
+        log_test "PASS" "Create and push feature branch" "Successfully created feature-test branch with file modifications"
     else
         log_test "FAIL" "Create and push feature branch" "Failed to push branch"
     fi
     
-    # Test 6.5: Make another commit on feature branch
-    echo "More feature content" >> feature.txt
-    git add feature.txt
-    git commit -m "Update feature" 2>&1 >> /tmp/git-branch-$TIMESTAMP.log
+    # Test 6.5: Make another commit on feature branch (refinement)
+    cat >> feature.js << 'EOF'
+
+// Additional helper function
+function validateFeature() {
+  return newFeature().status === 'success';
+}
+
+module.exports = { newFeature, validateFeature };
+EOF
+    
+    git add feature.js
+    git commit -m "Add feature validation helper" 2>&1 >> /tmp/git-branch-$TIMESTAMP.log
     git push origin feature-test 2>&1 >> /tmp/git-push-$TIMESTAMP.log
     
     if [ $? -eq 0 ]; then
-        log_test "PASS" "Multiple commits on feature branch" "Successfully pushed second commit"
+        log_test "PASS" "Multiple commits on feature branch" "Successfully pushed refinement commit"
     else
         log_test "WARN" "Multiple commits on feature branch" "Second commit push failed"
     fi
+    
+    # Switch back to main for later tests
+    git checkout main 2>&1 >> /tmp/git-branch-$TIMESTAMP.log
     
 else
     log_test "FAIL" "Clone repository via Git protocol" "Failed to clone. Check /tmp/git-clone-$TIMESTAMP.log"
 fi
 
-cd /home/azureuser/gitclaw
+cd "$(dirname "$(dirname "$0")")"
 
 # Test 7: Repository Browsing
 echo "## 7. Repository Browsing Tests" >> "$TEST_RESULTS_FILE"
@@ -402,7 +496,7 @@ echo -e "\n${BLUE}[7] Repository Browsing Tests${NC}"
 
 # Test 7.1: Get repository info
 REPO_INFO_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME")
-REPO_INFO_HTTP_CODE=$(echo "$REPO_INFO_RESPONSE" | tail -n1)
+REPO_INFO_HTTP_CODE=$(echo "$REPO_INFO_RESPONSE" | tail -n 1)
 
 if [ "$REPO_INFO_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Get repository info" "Successfully retrieved repository info"
@@ -412,8 +506,8 @@ fi
 
 # Test 7.2: Get branches
 BRANCHES_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/branches")
-BRANCHES_HTTP_CODE=$(echo "$BRANCHES_RESPONSE" | tail -n1)
-BRANCHES_DATA=$(echo "$BRANCHES_RESPONSE" | head -n-1)
+BRANCHES_HTTP_CODE=$(echo "$BRANCHES_RESPONSE" | tail -n 1)
+BRANCHES_DATA=$(echo "$BRANCHES_RESPONSE" | sed $d)
 
 if [ "$BRANCHES_HTTP_CODE" == "200" ]; then
     BRANCH_LIST=$(echo "$BRANCHES_DATA" | grep -o '"[^"]*"' | head -10)
@@ -425,8 +519,8 @@ fi
 
 # Test 7.3: Get commits
 COMMITS_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/commits")
-COMMITS_HTTP_CODE=$(echo "$COMMITS_RESPONSE" | tail -n1)
-COMMITS_DATA=$(echo "$COMMITS_RESPONSE" | head -n-1)
+COMMITS_HTTP_CODE=$(echo "$COMMITS_RESPONSE" | tail -n 1)
+COMMITS_DATA=$(echo "$COMMITS_RESPONSE" | sed $d)
 
 if [ "$COMMITS_HTTP_CODE" == "200" ]; then
     COMMIT_COUNT=$(echo "$COMMITS_DATA" | grep -o '"sha"' | wc -l)
@@ -437,7 +531,7 @@ fi
 
 # Test 7.4: Get file tree (root)
 TREE_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/tree/")
-TREE_HTTP_CODE=$(echo "$TREE_RESPONSE" | tail -n1)
+TREE_HTTP_CODE=$(echo "$TREE_RESPONSE" | tail -n 1)
 
 if [ "$TREE_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Get file tree (root)" "Successfully retrieved file tree"
@@ -447,7 +541,7 @@ fi
 
 # Test 7.5: Get specific file content
 FILE_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/tree/README.md")
-FILE_HTTP_CODE=$(echo "$FILE_RESPONSE" | tail -n1)
+FILE_HTTP_CODE=$(echo "$FILE_RESPONSE" | tail -n 1)
 
 if [ "$FILE_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Get file content" "Successfully retrieved README.md"
@@ -457,7 +551,7 @@ fi
 
 # Test 7.6: Get repository stats
 STATS_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/stats")
-STATS_HTTP_CODE=$(echo "$STATS_RESPONSE" | tail -n1)
+STATS_HTTP_CODE=$(echo "$STATS_RESPONSE" | tail -n 1)
 
 if [ "$STATS_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Get repository stats" "Successfully retrieved repository statistics"
@@ -471,7 +565,7 @@ echo -e "\n${BLUE}[8] Pull Request Tests${NC}"
 
 # Check if PRs endpoint exists first
 PR_LIST_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls")
-PR_LIST_HTTP_CODE=$(echo "$PR_LIST_RESPONSE" | tail -n1)
+PR_LIST_HTTP_CODE=$(echo "$PR_LIST_RESPONSE" | tail -n 1)
 
 if [ "$PR_LIST_HTTP_CODE" == "200" ]; then
     log_test "PASS" "List pull requests endpoint" "PR endpoint accessible"
@@ -480,10 +574,10 @@ if [ "$PR_LIST_HTTP_CODE" == "200" ]; then
     PR_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer $AGENT1_API_KEY" \
-        -d "{\"title\":\"Test PR\",\"description\":\"Test pull request\",\"sourceBranch\":\"feature-test\",\"targetBranch\":\"main\",\"authorUsername\":\"$AGENT1_USERNAME\"}")
+        -d "{\"title\":\"Test PR\",\"description\":\"Test pull request\",\"sourceBranch\":\"feature-test\",\"targetBranch\":\"$TARGET_BRANCH\",\"authorUsername\":\"$AGENT1_USERNAME\"}")
     
-    PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -n1)
-    PR_DATA=$(echo "$PR_RESPONSE" | head -n-1)
+    PR_HTTP_CODE=$(echo "$PR_RESPONSE" | tail -n 1)
+    PR_DATA=$(echo "$PR_RESPONSE" | sed $d)
     
     if [ "$PR_HTTP_CODE" == "200" ] || [ "$PR_HTTP_CODE" == "201" ]; then
         PR_NUMBER=$(echo "$PR_DATA" | grep -o '"number":[0-9]*' | head -1 | cut -d':' -f2)
@@ -491,7 +585,7 @@ if [ "$PR_LIST_HTTP_CODE" == "200" ]; then
         
         # Test 8.2: Get PR details
         PR_DETAIL_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR_NUMBER")
-        PR_DETAIL_HTTP_CODE=$(echo "$PR_DETAIL_RESPONSE" | tail -n1)
+        PR_DETAIL_HTTP_CODE=$(echo "$PR_DETAIL_RESPONSE" | tail -n 1)
         
         if [ "$PR_DETAIL_HTTP_CODE" == "200" ]; then
             log_test "PASS" "Get PR details" "Successfully retrieved PR #$PR_NUMBER details"
@@ -504,9 +598,9 @@ if [ "$PR_LIST_HTTP_CODE" == "200" ]; then
             COMMENT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR_NUMBER/comments" \
                 -H "Content-Type: application/json" \
                 -H "Authorization: Bearer $AGENT2_API_KEY" \
-                -d "{\"content\":\"Test comment from Agent 2\",\"authorUsername\":\"$AGENT2_USERNAME\"}")
+                -d "{\"body\":\"Test comment from Agent 2\"}")
             
-            COMMENT_HTTP_CODE=$(echo "$COMMENT_RESPONSE" | tail -n1)
+            COMMENT_HTTP_CODE=$(echo "$COMMENT_RESPONSE" | tail -n 1)
             if [ "$COMMENT_HTTP_CODE" == "200" ] || [ "$COMMENT_HTTP_CODE" == "201" ]; then
                 log_test "PASS" "Add PR comment" "Successfully added comment to PR #$PR_NUMBER"
             else
@@ -518,13 +612,26 @@ if [ "$PR_LIST_HTTP_CODE" == "200" ]; then
         REVIEW_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR_NUMBER/reviews" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $AGENT2_API_KEY" \
-            -d "{\"status\":\"approved\",\"comment\":\"Looks good!\",\"reviewerUsername\":\"$AGENT2_USERNAME\"}")
+            -d "{\"status\":\"approved\",\"body\":\"Looks good!\"}")
         
-        REVIEW_HTTP_CODE=$(echo "$REVIEW_RESPONSE" | tail -n1)
+        REVIEW_HTTP_CODE=$(echo "$REVIEW_RESPONSE" | tail -n 1)
         if [ "$REVIEW_HTTP_CODE" == "200" ] || [ "$REVIEW_HTTP_CODE" == "201" ]; then
             log_test "PASS" "Add PR review" "Successfully added review to PR #$PR_NUMBER"
         else
             log_test "WARN" "Add PR review" "Review endpoint may not be implemented, got $REVIEW_HTTP_CODE"
+        fi
+        
+        # Test 8.5: Merge pull request
+        MERGE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR_NUMBER/merge" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $AGENT1_API_KEY")
+        
+        MERGE_HTTP_CODE=$(echo "$MERGE_RESPONSE" | tail -n 1)
+        MERGE_BODY=$(echo "$MERGE_RESPONSE" | sed '$d')
+        if [ "$MERGE_HTTP_CODE" == "200" ]; then
+            log_test "PASS" "Merge pull request" "Successfully merged PR #$PR_NUMBER"
+        else
+            log_test "FAIL" "Merge pull request" "Expected 200, got $MERGE_HTTP_CODE. Response: $(echo "$MERGE_BODY" | head -c 300)"
         fi
         
     else
@@ -539,42 +646,51 @@ echo "## 9. Social Features Tests" >> "$TEST_RESULTS_FILE"
 echo -e "\n${BLUE}[9] Social Features Tests${NC}"
 
 # Test 9.1: Star repository
-STAR_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/star" \
+STAR_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/star" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $AGENT2_API_KEY" \
-    -d "{\"username\":\"$AGENT2_USERNAME\"}")
+    -H "Authorization: Bearer $AGENT2_API_KEY")
 
-STAR_HTTP_CODE=$(echo "$STAR_RESPONSE" | tail -n1)
-if [ "$STAR_HTTP_CODE" == "200" ] || [ "$STAR_HTTP_CODE" == "204" ]; then
+STAR_HTTP_CODE=$(echo "$STAR_RESPONSE" | tail -n 1)
+if [ "$STAR_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Star repository" "Agent2 starred Agent1's repository"
     
-    # Test 9.2: Unstar repository
+    # Test 9.2: Unstar repository (toggle via DELETE)
     UNSTAR_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/star" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer $AGENT2_API_KEY" \
-        -d "{\"username\":\"$AGENT2_USERNAME\"}")
+        -H "Authorization: Bearer $AGENT2_API_KEY")
     
-    UNSTAR_HTTP_CODE=$(echo "$UNSTAR_RESPONSE" | tail -n1)
-    if [ "$UNSTAR_HTTP_CODE" == "200" ] || [ "$UNSTAR_HTTP_CODE" == "204" ]; then
+    UNSTAR_HTTP_CODE=$(echo "$UNSTAR_RESPONSE" | tail -n 1)
+    if [ "$UNSTAR_HTTP_CODE" == "200" ]; then
         log_test "PASS" "Unstar repository" "Successfully unstarred"
     else
-        log_test "FAIL" "Unstar repository" "Expected 200/204, got $UNSTAR_HTTP_CODE"
+        log_test "FAIL" "Unstar repository" "Expected 200, got $UNSTAR_HTTP_CODE"
     fi
 else
-    log_test "WARN" "Star repository" "Star feature may not be fully implemented, got $STAR_HTTP_CODE"
+    log_test "FAIL" "Star repository" "Expected 200, got $STAR_HTTP_CODE"
 fi
 
 # Test 9.3: Watch repository
-WATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/watch" \
+WATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/watch" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $AGENT2_API_KEY" \
-    -d "{\"username\":\"$AGENT2_USERNAME\"}")
+    -H "Authorization: Bearer $AGENT2_API_KEY")
 
-WATCH_HTTP_CODE=$(echo "$WATCH_RESPONSE" | tail -n1)
-if [ "$WATCH_HTTP_CODE" == "200" ] || [ "$WATCH_HTTP_CODE" == "204" ]; then
+WATCH_HTTP_CODE=$(echo "$WATCH_RESPONSE" | tail -n 1)
+if [ "$WATCH_HTTP_CODE" == "200" ]; then
     log_test "PASS" "Watch repository" "Agent2 watching Agent1's repository"
+    
+    # Test 9.4: Unwatch repository (toggle via DELETE)
+    UNWATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/watch" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $AGENT2_API_KEY")
+    
+    UNWATCH_HTTP_CODE=$(echo "$UNWATCH_RESPONSE" | tail -n 1)
+    if [ "$UNWATCH_HTTP_CODE" == "200" ]; then
+        log_test "PASS" "Unwatch repository" "Successfully unwatched"
+    else
+        log_test "FAIL" "Unwatch repository" "Expected 200, got $UNWATCH_HTTP_CODE"
+    fi
 else
-    log_test "WARN" "Watch repository" "Watch feature may not be fully implemented, got $WATCH_HTTP_CODE"
+    log_test "FAIL" "Watch repository" "Expected 200, got $WATCH_HTTP_CODE"
 fi
 
 # Test 9.4: Fork repository
@@ -582,7 +698,7 @@ FORK_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $AGENT2_API_KEY")
 
-FORK_HTTP_CODE=$(echo "$FORK_RESPONSE" | tail -n1)
+FORK_HTTP_CODE=$(echo "$FORK_RESPONSE" | tail -n 1)
 if [ "$FORK_HTTP_CODE" == "201" ]; then
     log_test "PASS" "Fork repository" "Agent2 successfully forked Agent1's repository"
 else
@@ -593,9 +709,10 @@ fi
 echo "## 10. Edge Cases & Security Tests" >> "$TEST_RESULTS_FILE"
 echo -e "\n${BLUE}[10] Edge Cases & Security Tests${NC}"
 
-# Test 10.1: SQL Injection attempt
-SQL_INJECTION_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/agents/admin' OR '1'='1")
-SQL_INJECTION_HTTP_CODE=$(echo "$SQL_INJECTION_RESPONSE" | tail -n1)
+# Test 10.1: SQL Injection attempt (URL-encode path so server receives valid request)
+SQL_INJECTION_USERNAME="admin%27%20OR%20%271%27%3D%271"
+SQL_INJECTION_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/agents/$SQL_INJECTION_USERNAME")
+SQL_INJECTION_HTTP_CODE=$(echo "$SQL_INJECTION_RESPONSE" | tail -n 1)
 
 if [ "$SQL_INJECTION_HTTP_CODE" == "404" ] || [ "$SQL_INJECTION_HTTP_CODE" == "400" ]; then
     log_test "PASS" "SQL injection protection" "SQL injection attempt handled safely"
@@ -608,7 +725,7 @@ XSS_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/agents/register
     -H "Content-Type: application/json" \
     -d "{\"name\":\"<script>alert('xss')</script>\",\"email\":\"xss@test.com\"}")
 
-XSS_HTTP_CODE=$(echo "$XSS_RESPONSE" | tail -n1)
+XSS_HTTP_CODE=$(echo "$XSS_RESPONSE" | tail -n 1)
 if [ "$XSS_HTTP_CODE" == "400" ]; then
     log_test "PASS" "XSS protection in username" "Correctly rejected script tags"
 else
@@ -617,7 +734,7 @@ fi
 
 # Test 10.3: Authentication required endpoints
 UNAUTH_RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL/api/agents/me)
-UNAUTH_HTTP_CODE=$(echo "$UNAUTH_RESPONSE" | tail -n1)
+UNAUTH_HTTP_CODE=$(echo "$UNAUTH_RESPONSE" | tail -n 1)
 
 if [ "$UNAUTH_HTTP_CODE" == "401" ]; then
     log_test "PASS" "Authentication enforcement" "Protected endpoint correctly returns 401"
@@ -627,7 +744,7 @@ fi
 
 # Test 10.4: Invalid API key
 INVALID_KEY_RESPONSE=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer invalid-key-12345" $BASE_URL/api/agents/me)
-INVALID_KEY_HTTP_CODE=$(echo "$INVALID_KEY_RESPONSE" | tail -n1)
+INVALID_KEY_HTTP_CODE=$(echo "$INVALID_KEY_RESPONSE" | tail -n 1)
 
 if [ "$INVALID_KEY_HTTP_CODE" == "401" ]; then
     log_test "PASS" "Invalid API key rejection" "Correctly rejected invalid API key"
@@ -640,7 +757,7 @@ echo "  Testing rate limiting (sending 20 rapid requests)..."
 RATE_LIMIT_TRIGGERED=0
 for i in {1..20}; do
     RATE_RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL/health)
-    RATE_HTTP_CODE=$(echo "$RATE_RESPONSE" | tail -n1)
+    RATE_HTTP_CODE=$(echo "$RATE_RESPONSE" | tail -n 1)
     if [ "$RATE_HTTP_CODE" == "429" ]; then
         RATE_LIMIT_TRIGGERED=1
         break
@@ -661,11 +778,334 @@ LARGE_PAYLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repos
     -H "Authorization: Bearer $AGENT1_API_KEY" \
     -d "{\"owner\":\"$AGENT1_USERNAME\",\"name\":\"large-test\",\"description\":\"$LARGE_DESC\"}")
 
-LARGE_PAYLOAD_HTTP_CODE=$(echo "$LARGE_PAYLOAD_RESPONSE" | tail -n1)
+LARGE_PAYLOAD_HTTP_CODE=$(echo "$LARGE_PAYLOAD_RESPONSE" | tail -n 1)
 if [ "$LARGE_PAYLOAD_HTTP_CODE" == "400" ] || [ "$LARGE_PAYLOAD_HTTP_CODE" == "413" ]; then
     log_test "PASS" "Large payload rejection" "Correctly rejected oversized payload"
 else
     log_test "WARN" "Large payload handling" "May need payload size limits, got $LARGE_PAYLOAD_HTTP_CODE"
+fi
+
+# Test 11: Issues Management
+echo "## 11. Issues Management Tests" >> "$TEST_RESULTS_FILE"
+echo -e "\n${BLUE}[11] Issues Management Tests${NC}"
+
+# Test 11.1: Create Issue #1
+ISSUE1_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    -d '{"title":"Test Issue #1","body":"This is a test issue"}')
+
+ISSUE1_HTTP_CODE=$(echo "$ISSUE1_RESPONSE" | tail -n 1)
+ISSUE1_BODY=$(echo "$ISSUE1_RESPONSE" | sed $d)
+ISSUE1_NUMBER=$(echo "$ISSUE1_BODY" | jq -r '.number // .issue.number // empty')
+
+if [[ "$ISSUE1_HTTP_CODE" == "200" || "$ISSUE1_HTTP_CODE" == "201" ]] && [ "$ISSUE1_NUMBER" == "1" ]; then
+    log_test "PASS" "Create issue #1" "Issue created with number 1"
+else
+    log_test "FAIL" "Create issue #1" "Expected HTTP 200/201 and issue number 1, got $ISSUE1_HTTP_CODE"
+fi
+
+# Test 11.2: List issues
+ISSUES_LIST=$(curl -s -X GET "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues?status=open" \
+    -H "Authorization: Bearer $AGENT1_API_KEY")
+ISSUE_COUNT=$(echo "$ISSUES_LIST" | jq -r '.issues | length')
+
+if [ "$ISSUE_COUNT" -ge "1" ]; then
+    log_test "PASS" "List open issues" "Found $ISSUE_COUNT issue(s)"
+else
+    log_test "FAIL" "List open issues" "Expected at least 1 issue, got $ISSUE_COUNT"
+fi
+
+# Test 11.3: Get specific issue
+ISSUE_DETAIL=$(curl -s -X GET "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/1" \
+    -H "Authorization: Bearer $AGENT1_API_KEY")
+ISSUE_TITLE=$(echo "$ISSUE_DETAIL" | jq -r '.title')
+
+if [ "$ISSUE_TITLE" == "Test Issue #1" ]; then
+    log_test "PASS" "Get issue by number" "Retrieved correct issue"
+else
+    log_test "FAIL" "Get issue by number" "Expected 'Test Issue #1', got '$ISSUE_TITLE'"
+fi
+
+# Test 11.4: Add comment to issue
+COMMENT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/1/comments" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    -d '{"body":"This is a test comment"}')
+
+COMMENT_HTTP_CODE=$(echo "$COMMENT_RESPONSE" | tail -n 1)
+
+if [[ "$COMMENT_HTTP_CODE" == "200" || "$COMMENT_HTTP_CODE" == "201" ]]; then
+    log_test "PASS" "Add issue comment" "Comment added successfully"
+else
+    log_test "FAIL" "Add issue comment" "Expected HTTP 200/201, got $COMMENT_HTTP_CODE"
+fi
+
+# Test 11.5: Close issue
+CLOSE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/1/close" \
+    -H "Authorization: Bearer $AGENT1_API_KEY")
+
+CLOSE_HTTP_CODE=$(echo "$CLOSE_RESPONSE" | tail -n 1)
+
+if [ "$CLOSE_HTTP_CODE" == "200" ]; then
+    log_test "PASS" "Close issue" "Issue closed successfully"
+else
+    log_test "FAIL" "Close issue" "Expected HTTP 200, got $CLOSE_HTTP_CODE"
+fi
+
+# Test 11.6: Reopen issue
+REOPEN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/1/reopen" \
+    -H "Authorization: Bearer $AGENT1_API_KEY")
+
+REOPEN_HTTP_CODE=$(echo "$REOPEN_RESPONSE" | tail -n 1)
+
+if [ "$REOPEN_HTTP_CODE" == "200" ]; then
+    log_test "PASS" "Reopen issue" "Issue reopened successfully"
+else
+    log_test "FAIL" "Reopen issue" "Expected HTTP 200, got $REOPEN_HTTP_CODE"
+fi
+
+# Test 12: Releases Management
+echo "## 12. Releases Management Tests" >> "$TEST_RESULTS_FILE"
+echo -e "\n${BLUE}[12] Releases Management Tests${NC}"
+
+# Test 12.1: Create draft release
+RELEASE1_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/releases" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    -d '{"tagName":"v1.0.0","name":"Version 1.0.0","body":"Initial release","isDraft":true,"isPrerelease":false}')
+
+RELEASE1_HTTP_CODE=$(echo "$RELEASE1_RESPONSE" | tail -n 1)
+RELEASE1_BODY=$(echo "$RELEASE1_RESPONSE" | sed '$d')
+RELEASE1_TAG=$(echo "$RELEASE1_BODY" | jq -r '.tagName // .release.tagName // empty')
+
+if [[ "$RELEASE1_HTTP_CODE" == "200" || "$RELEASE1_HTTP_CODE" == "201" ]] && [ "$RELEASE1_TAG" == "v1.0.0" ]; then
+    log_test "PASS" "Create draft release" "Draft release v1.0.0 created"
+    RELEASE1_ID=$(echo "$RELEASE1_BODY" | jq -r '.id // .release.id // empty')
+else
+    log_test "FAIL" "Create draft release" "Expected HTTP 200/201 and tag v1.0.0, got $RELEASE1_HTTP_CODE"
+fi
+
+# Test 12.2: List releases
+RELEASES_LIST=$(curl -s -X GET "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/releases" \
+    -H "Authorization: Bearer $AGENT1_API_KEY")
+RELEASE_COUNT=$(echo "$RELEASES_LIST" | jq -r '.releases | length')
+
+if [ "$RELEASE_COUNT" -ge "1" ]; then
+    log_test "PASS" "List releases" "Found $RELEASE_COUNT release(s)"
+else
+    log_test "FAIL" "List releases" "Expected at least 1 release, got $RELEASE_COUNT"
+fi
+
+# Test 12.3: Get release by tag
+RELEASE_DETAIL=$(curl -s -X GET "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/releases/tags/v1.0.0" \
+    -H "Authorization: Bearer $AGENT1_API_KEY")
+RELEASE_NAME=$(echo "$RELEASE_DETAIL" | jq -r '.name')
+
+if [ "$RELEASE_NAME" == "Version 1.0.0" ]; then
+    log_test "PASS" "Get release by tag" "Retrieved correct release"
+else
+    log_test "FAIL" "Get release by tag" "Expected 'Version 1.0.0', got '$RELEASE_NAME'"
+fi
+
+# Test 12.4: Publish draft release
+if [ -n "$RELEASE1_ID" ] && [ "$RELEASE1_ID" != "null" ]; then
+    PUBLISH_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/releases/$RELEASE1_ID/publish" \
+        -H "Authorization: Bearer $AGENT1_API_KEY")
+    
+    PUBLISH_HTTP_CODE=$(echo "$PUBLISH_RESPONSE" | tail -n 1)
+    
+    if [ "$PUBLISH_HTTP_CODE" == "200" ]; then
+        log_test "PASS" "Publish draft release" "Release published successfully"
+    else
+        log_test "FAIL" "Publish draft release" "Expected HTTP 200, got $PUBLISH_HTTP_CODE"
+    fi
+fi
+
+# Test 12.5: Get latest release
+LATEST_RELEASE=$(curl -s -X GET "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/releases/latest")
+LATEST_TAG=$(echo "$LATEST_RELEASE" | jq -r '.tagName')
+
+if [ "$LATEST_TAG" == "v1.0.0" ]; then
+    log_test "PASS" "Get latest release" "Latest release is v1.0.0"
+else
+    log_test "WARN" "Get latest release" "Expected v1.0.0, got '$LATEST_TAG'"
+fi
+
+# Test 12.6: Create prerelease
+PRERELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/releases" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    -d '{"tagName":"v2.0.0-beta","name":"Version 2.0.0 Beta","body":"Beta release","isDraft":false,"isPrerelease":true}')
+
+PRERELEASE_HTTP_CODE=$(echo "$PRERELEASE_RESPONSE" | tail -n 1)
+
+if [[ "$PRERELEASE_HTTP_CODE" == "200" || "$PRERELEASE_HTTP_CODE" == "201" ]]; then
+    log_test "PASS" "Create prerelease" "Prerelease created successfully"
+else
+    log_test "FAIL" "Create prerelease" "Expected HTTP 200/201, got $PRERELEASE_HTTP_CODE"
+fi
+
+# Test 13: Repository Update Authorization
+echo "## 13. Repository Update Authorization Tests" >> "$TEST_RESULTS_FILE"
+echo -e "\n${BLUE}[13] Repository Update Authorization Tests${NC}"
+
+# Test 13.1: UPDATE without authentication
+UPDATE_NO_AUTH=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+    -H "Content-Type: application/json" \
+    -d '{"description":"Unauthorized update"}' \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME")
+
+if [ "$UPDATE_NO_AUTH" == "401" ]; then
+    log_test "PASS" "UPDATE without auth returns 401" "Correctly blocked"
+else
+    log_test "FAIL" "UPDATE without auth" "Expected 401, got $UPDATE_NO_AUTH"
+fi
+
+# Test 13.2: UPDATE with invalid API key
+UPDATE_INVALID_KEY=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer invalid-key-123" \
+    -d '{"description":"Invalid update"}' \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME")
+
+if [ "$UPDATE_INVALID_KEY" == "401" ]; then
+    log_test "PASS" "UPDATE with invalid key returns 401" "Correctly blocked"
+else
+    log_test "FAIL" "UPDATE with invalid key" "Expected 401, got $UPDATE_INVALID_KEY"
+fi
+
+# Test 13.3: UPDATE by non-owner
+UPDATE_NON_OWNER=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT2_API_KEY" \
+    -d '{"description":"Forbidden update"}' \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME")
+
+if [ "$UPDATE_NON_OWNER" == "403" ]; then
+    log_test "PASS" "UPDATE by non-owner returns 403" "Correctly blocked"
+else
+    log_test "FAIL" "UPDATE by non-owner" "Expected 403, got $UPDATE_NON_OWNER"
+fi
+
+# Test 13.4: Valid UPDATE by owner
+UPDATE_VALID=$(curl -s -w "\n%{http_code}" -X PATCH \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    -d '{"description":"Updated by owner"}' \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME")
+
+UPDATE_VALID_CODE=$(echo "$UPDATE_VALID" | tail -n 1)
+
+if [ "$UPDATE_VALID_CODE" == "200" ]; then
+    log_test "PASS" "Valid UPDATE by owner" "Update successful"
+else
+    log_test "FAIL" "Valid UPDATE by owner" "Expected 200, got $UPDATE_VALID_CODE"
+fi
+
+# Test 14: Repository Delete Authorization
+echo "## 14. Repository Delete Authorization Tests" >> "$TEST_RESULTS_FILE"
+echo -e "\n${BLUE}[14] Repository Delete Authorization Tests${NC}"
+
+# Create a test repository for deletion tests
+DELETE_TEST_REPO="delete-test-$(date +%s)"
+curl -s -X POST $BASE_URL/api/repositories \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    -d "{\"name\":\"$DELETE_TEST_REPO\",\"description\":\"For delete testing\"}" > /dev/null
+
+# Test 14.1: DELETE without authentication
+DELETE_NO_AUTH=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$DELETE_TEST_REPO")
+
+if [ "$DELETE_NO_AUTH" == "401" ]; then
+    log_test "PASS" "DELETE without auth returns 401" "Correctly blocked"
+else
+    log_test "FAIL" "DELETE without auth" "Expected 401, got $DELETE_NO_AUTH"
+fi
+
+# Test 14.2: DELETE with invalid API key
+DELETE_INVALID_KEY=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+    -H "Authorization: Bearer invalid-key-123" \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$DELETE_TEST_REPO")
+
+if [ "$DELETE_INVALID_KEY" == "401" ]; then
+    log_test "PASS" "DELETE with invalid key returns 401" "Correctly blocked"
+else
+    log_test "FAIL" "DELETE with invalid key" "Expected 401, got $DELETE_INVALID_KEY"
+fi
+
+# Test 14.3: DELETE by non-owner
+DELETE_NON_OWNER=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+    -H "Authorization: Bearer $AGENT2_API_KEY" \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$DELETE_TEST_REPO")
+
+if [ "$DELETE_NON_OWNER" == "403" ]; then
+    log_test "PASS" "DELETE by non-owner returns 403" "Correctly blocked"
+else
+    log_test "FAIL" "DELETE by non-owner" "Expected 403, got $DELETE_NON_OWNER"
+fi
+
+# Test 14.4: DELETE non-existent repository
+DELETE_NOTFOUND=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/nonexistent-repo-999")
+
+if [ "$DELETE_NOTFOUND" == "404" ]; then
+    log_test "PASS" "DELETE non-existent repo returns 404" "Correctly handled"
+else
+    log_test "FAIL" "DELETE non-existent repo" "Expected 404, got $DELETE_NOTFOUND"
+fi
+
+# Test 14.5: Valid DELETE by owner
+DELETE_VALID=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    "$BASE_URL/api/repositories/$AGENT1_USERNAME/$DELETE_TEST_REPO")
+
+if [ "$DELETE_VALID" == "200" ]; then
+    log_test "PASS" "Valid DELETE by owner" "Repository deleted successfully"
+else
+    log_test "FAIL" "Valid DELETE by owner" "Expected 200, got $DELETE_VALID"
+fi
+
+# Test 15: Moltbook Integration
+echo "## 15. Moltbook Integration Tests" >> "$TEST_RESULTS_FILE"
+echo -e "\n${BLUE}[15] Moltbook Integration Tests${NC}"
+
+# Test 15.1: Registration response structure
+MOLTBOOK_AGENT="moltbook-test-$(date +%s)"
+MOLTBOOK_RESPONSE=$(curl -s -X POST $BASE_URL/api/agents/register \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"$MOLTBOOK_AGENT\",\"description\":\"Moltbook integration test\"}")
+
+# Check required Moltbook fields
+MOLTBOOK_SUCCESS=$(echo "$MOLTBOOK_RESPONSE" | jq -r '.success')
+MOLTBOOK_SETUP=$(echo "$MOLTBOOK_RESPONSE" | jq -r '.setup')
+MOLTBOOK_SKILL_FILES=$(echo "$MOLTBOOK_RESPONSE" | jq -r '.skill_files')
+MOLTBOOK_TWEET=$(echo "$MOLTBOOK_RESPONSE" | jq -r '.tweet_template')
+
+if [ "$MOLTBOOK_SUCCESS" != "null" ] && [ "$MOLTBOOK_SETUP" != "null" ] && [ "$MOLTBOOK_SKILL_FILES" != "null" ] && [ "$MOLTBOOK_TWEET" != "null" ]; then
+    log_test "PASS" "Moltbook response structure" "All required fields present"
+else
+    log_test "FAIL" "Moltbook response structure" "Missing required fields"
+fi
+
+# Test 15.2: skill.md endpoint
+SKILL_MD=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/skill.md")
+
+if [ "$SKILL_MD" == "200" ]; then
+    log_test "PASS" "skill.md endpoint" "Accessible"
+else
+    log_test "FAIL" "skill.md endpoint" "Expected 200, got $SKILL_MD"
+fi
+
+# Test 15.3: heartbeat.md endpoint
+HEARTBEAT_MD=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/heartbeat.md")
+
+if [ "$HEARTBEAT_MD" == "200" ]; then
+    log_test "PASS" "heartbeat.md endpoint" "Accessible"
+else
+    log_test "FAIL" "heartbeat.md endpoint" "Expected 200, got $HEARTBEAT_MD"
 fi
 
 # Cleanup test directory

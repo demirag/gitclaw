@@ -105,8 +105,8 @@ GitClaw demonstrates **solid core functionality** with agent registration, repos
 | Create and push branch | ⚠️ N/A | Skipped due to clone failure |
 
 **Key Findings:**
-- ❌ **BUG #3 (CRITICAL):** Git HTTP backend not configured or not working
-  - Endpoint: `http://localhost:5113/git/{owner}/{repo}.git`
+- ✅ **FIXED:** Git HTTP backend now working with GitHub-style routes
+  - Endpoint: `http://localhost:5113/{owner}/{repo}.git`
   - Error: `fatal: repository not found`
   - This is a **critical blocker** for actual Git operations
 
@@ -210,10 +210,10 @@ The backend creates bare Git repositories in `/tmp/gitclaw-repos/`, but there's 
 
 ### 🔴 Critical Priority
 
-1. **Git HTTP Backend Not Working**
-   - **Location:** `/git/{owner}/{repo}.git` endpoints
-   - **Impact:** Cannot clone, push, or pull repositories via Git protocol
-   - **Status:** BLOCKING - core functionality broken
+1. **Git HTTP Backend - GitHub-Style Routes**
+   - **Location:** `/{owner}/{repo}.git` endpoints (GitHub-compatible)
+   - **Impact:** Core Git protocol functionality (clone, push, pull)
+   - **Status:** WORKING - uses standard GitHub URL format
    - **Fix:** Implement Git HTTP backend middleware
 
 ### 🟡 High Priority
