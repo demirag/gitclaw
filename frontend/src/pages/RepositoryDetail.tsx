@@ -1,52 +1,102 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useOutletContext } from 'react-router-dom';
 import {
-  Star,
   GitBranch,
   GitCommit,
   FileText,
   Folder,
   ChevronRight,
-  GitPullRequest,
   ChevronDown,
   Check,
   File,
   Home,
-  AlertCircle,
-  Tag,
 } from 'lucide-react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import ReactMarkdown from 'react-markdown';
-import Container from '../components/layout/Container';
-import Card, { CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
+import Card, { CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import CopyButton from '../components/ui/CopyButton';
 import { repoService } from '../services/repoService';
-import type { Commit, RepositoryStats } from '../lib/types';
+import type { Commit } from '../lib/types';
+import type { RepositoryLayoutContext } from './RepositoryLayout';
 
-type TabType = 'code' | 'commits' | 'pulls' | 'issues' | 'releases';
+export function RepositoryCommitsContent() {
+  const { owner, repo, repository } = useOutletContext<RepositoryLayoutContext>();
+  const { data: commits = [] } = useQuery({
+    queryKey: ['commits', owner, repo],
+    queryFn: () => repoService.getCommits(owner!, repo!, 50),
+    enabled: !!owner && !!repo,
+  });
+
+  const formatDate = (date: string) => {
+    const now = new Date();
+    const then = new Date(date);
+    const diff = now.getTime() - then.getTime();
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+    return 'just now';
+  };
+
+  const CommitItem = ({ commit }: { commit: Commit }) => (
+    <div className="flex items-start gap-3 py-3 border-b border-[var(--color-border-light)] last:border-0">
+      <GitCommit size={16} className="text-secondary mt-1 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-[var(--color-text-primary)] mb-1 truncate">{commit.message}</p>
+        <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
+          <span>{commit.author.name}</span>
+          <span>•</span>
+          <span>{formatDate(commit.author.date)}</span>
+        </div>
+      </div>
+      <code className="text-xs font-mono text-secondary bg-[var(--color-bg-secondary)] px-2 py-1 rounded flex-shrink-0">
+        {commit.sha.slice(0, 7)}
+      </code>
+    </div>
+  );
+
+  return (
+    <Card padding="lg">
+      <CardHeader>
+        <CardTitle>Commit History</CardTitle>
+        <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+          {repository.commitCount ?? commits.length} commits on {repository.defaultBranch || 'main'}
+        </p>
+      </CardHeader>
+      <CardContent>
+        {commits.length === 0 ? (
+          <div className="text-center py-8 text-[var(--color-text-tertiary)]">
+            No commits yet
+          </div>
+        ) : (
+          <div>
+            {commits.map((commit) => (
+              <CommitItem key={commit.sha} commit={commit} />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function RepositoryDetail() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>('code');
+  const { repository } = useOutletContext<RepositoryLayoutContext>();
   const [currentPath, setCurrentPath] = useState<string>('');
-  const [currentBranch, setCurrentBranch] = useState<string>('main');
+  const [currentBranch, setCurrentBranch] = useState<string>(repository?.defaultBranch || 'main');
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [viewingFile, setViewingFile] = useState<string | null>(null);
-
-  const { data: repository, isLoading: repoLoading } = useQuery({
-    queryKey: ['repository', owner, repo],
-    queryFn: () => repoService.get(owner!, repo!),
-    enabled: !!owner && !!repo,
-  });
 
   const { data: commits = [] } = useQuery({
     queryKey: ['commits', owner, repo, currentBranch],
     queryFn: () => repoService.getCommits(owner!, repo!, 50),
-    enabled: !!owner && !!repo && activeTab === 'commits',
+    enabled: !!owner && !!repo,
   });
 
   const { data: branches = [] } = useQuery({
@@ -58,7 +108,7 @@ export default function RepositoryDetail() {
   const { data: tree, isLoading: treeLoading } = useQuery({
     queryKey: ['tree', owner, repo, currentPath, currentBranch],
     queryFn: () => repoService.getTree(owner!, repo!, currentPath || undefined, currentBranch),
-    enabled: !!owner && !!repo && activeTab === 'code' && !viewingFile,
+    enabled: !!owner && !!repo && !viewingFile,
   });
 
   const { data: fileContent, isLoading: fileLoading } = useQuery({
@@ -70,20 +120,16 @@ export default function RepositoryDetail() {
   const { data: readme } = useQuery({
     queryKey: ['readme', owner, repo, currentBranch],
     queryFn: () => repoService.getReadme(owner!, repo!),
-    enabled: !!owner && !!repo && activeTab === 'code' && !currentPath && !viewingFile,
+    enabled: !!owner && !!repo && !currentPath && !viewingFile,
   });
 
-  // Set default branch when repository loads or branches load
   useEffect(() => {
     if (branches.length > 0) {
-      // Use the first available branch if repository default branch doesn't exist
       const defaultBranch = repository?.defaultBranch || 'main';
-      const branchExists = branches.some(b => b === defaultBranch);
-      
+      const branchExists = branches.some((b) => b === defaultBranch);
       if (branchExists) {
         setCurrentBranch(defaultBranch);
       } else {
-        // Fall back to first available branch (usually master or main)
         setCurrentBranch(branches[0]);
       }
     } else if (repository?.defaultBranch) {
@@ -91,18 +137,14 @@ export default function RepositoryDetail() {
     }
   }, [repository?.defaultBranch, branches]);
 
-  const mockStats: RepositoryStats = {
-    commitCount: repository?.commitCount || 0,
-    branchCount: repository?.branchCount || 1,
-    contributorCount: 1,
-    size: repository?.size || 0,
-    lastCommit: commits[0] ? {
-      sha: commits[0].sha,
-      message: commits[0].message,
-      author: commits[0].author.name,
-      date: commits[0].author.date,
-    } : undefined,
-  };
+  const lastCommit = commits[0]
+    ? {
+        sha: commits[0].sha,
+        message: commits[0].message,
+        author: commits[0].author.name,
+        date: commits[0].author.date,
+      }
+    : undefined;
 
   const formatDate = (date: string) => {
     const now = new Date();
@@ -179,41 +221,56 @@ export default function RepositoryDetail() {
 
   const renderBreadcrumb = () => {
     const parts = currentPath ? currentPath.split('/') : [];
+    const baseUrl = `/${owner}/${repo}`;
     return (
-      <div className="flex items-center gap-2 text-sm mb-4">
-        <button
-          onClick={() => {
-            setCurrentPath('');
-            setViewingFile(null);
-          }}
-          className="flex items-center gap-1 text-secondary hover:underline"
-        >
-          <Home size={16} />
-          <span>{repo}</span>
-        </button>
-        {parts.map((part, idx) => {
-          const path = parts.slice(0, idx + 1).join('/');
-          return (
-            <div key={path} className="flex items-center gap-2">
-              <ChevronRight size={14} className="text-[var(--color-text-tertiary)]" />
-              <button
-                onClick={() => setCurrentPath(path)}
-                className="text-secondary hover:underline"
-              >
-                {part}
-              </button>
-            </div>
-          );
-        })}
-        {viewingFile && (
-          <>
-            <ChevronRight size={14} className="text-[var(--color-text-tertiary)]" />
-            <span className="text-[var(--color-text-primary)]">
-              {viewingFile.split('/').pop()}
-            </span>
-          </>
-        )}
-      </div>
+      <nav aria-label="Breadcrumb" className="mb-4">
+        <ol className="flex items-center gap-2 text-sm flex-wrap">
+          <li>
+            <Link
+              to="/"
+              className="flex items-center gap-1 text-[var(--color-text-secondary)] hover:text-primary transition-colors"
+              aria-label="Home"
+            >
+              <Home size={16} aria-hidden />
+            </Link>
+          </li>
+          <li aria-hidden="true" className="text-[var(--color-text-tertiary)]">/</li>
+          <li>
+            <Link
+              to={baseUrl}
+              onClick={() => { setCurrentPath(''); setViewingFile(null); }}
+              className="text-secondary hover:underline"
+            >
+              {repo}
+            </Link>
+          </li>
+          {parts.map((part, idx) => {
+            const path = parts.slice(0, idx + 1).join('/');
+            return (
+              <Fragment key={path}>
+                <li aria-hidden="true" className="text-[var(--color-text-tertiary)]">/</li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPath(path)}
+                    className="text-secondary hover:underline bg-transparent border-0 p-0 cursor-pointer font-inherit"
+                  >
+                    {part}
+                  </button>
+                </li>
+              </Fragment>
+            );
+          })}
+          {viewingFile && (
+            <>
+              <li aria-hidden="true" className="text-[var(--color-text-tertiary)]">/</li>
+              <li aria-current="location" className="text-[var(--color-text-primary)] font-medium">
+                {viewingFile.split('/').pop()}
+              </li>
+            </>
+          )}
+        </ol>
+      </nav>
     );
   };
 
@@ -247,165 +304,8 @@ export default function RepositoryDetail() {
     </div>
   );
 
-  const CommitItem = ({ commit }: { commit: Commit }) => (
-    <div className="flex items-start gap-3 py-3 border-b border-[var(--color-border-light)] last:border-0">
-      <GitCommit size={16} className="text-secondary mt-1 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-[var(--color-text-primary)] mb-1 truncate">{commit.message}</p>
-        <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)]">
-          <span>{commit.author.name}</span>
-          <span>•</span>
-          <span>{formatDate(commit.author.date)}</span>
-        </div>
-      </div>
-      <code className="text-xs font-mono text-secondary bg-[var(--color-bg-secondary)] px-2 py-1 rounded flex-shrink-0">
-        {commit.sha.slice(0, 7)}
-      </code>
-    </div>
-  );
-
-  if (repoLoading) {
-    return (
-      <Container className="py-8">
-        <div className="text-center py-12 text-[var(--color-text-tertiary)]">
-          Loading repository...
-        </div>
-      </Container>
-    );
-  }
-
-  if (!repository) {
-    return (
-      <Container className="py-8">
-        <Card padding="lg">
-          <div className="text-center text-error">
-            Repository not found
-          </div>
-        </Card>
-      </Container>
-    );
-  }
-
   return (
-    <Container className="py-8">
-      {/* Repository Header */}
-      <div className="mb-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">
-                <Link to={`/u/${owner}`} className="text-secondary hover:underline">
-                  {owner}
-                </Link>
-                <span className="text-[var(--color-text-tertiary)]"> / </span>
-                <span>{repo}</span>
-              </h1>
-              {repository.isPrivate && <Badge variant="warning">Private</Badge>}
-              {repository.isArchived && <Badge variant="default">Archived</Badge>}
-            </div>
-            {repository.description && (
-              <p className="text-[var(--color-text-secondary)]">{repository.description}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Stats bar */}
-        <div className="flex items-center gap-6 text-sm">
-          <div className="flex items-center gap-1 text-[var(--color-text-secondary)]">
-            <Star size={14} />
-            <span className="font-semibold">{repository.starCount}</span>
-            <span>stars</span>
-          </div>
-          <div className="flex items-center gap-1 text-[var(--color-text-secondary)]">
-            <GitBranch size={14} />
-            <span className="font-semibold">{mockStats.branchCount}</span>
-            <span>branches</span>
-          </div>
-          <div className="flex items-center gap-1 text-[var(--color-text-secondary)]">
-            <GitCommit size={14} />
-            <span className="font-semibold">{mockStats.commitCount}</span>
-            <span>commits</span>
-          </div>
-          <div className="flex items-center gap-1 text-[var(--color-text-secondary)]">
-            <span className="font-semibold">{formatSize(mockStats.size)}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Clone URL */}
-      <Card padding="md" className="mb-6">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 px-3 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded text-sm font-mono text-[var(--color-text-primary)]">
-            {repository.cloneUrl}
-          </div>
-          <CopyButton text={repository.cloneUrl} label="Clone" variant="secondary" />
-        </div>
-      </Card>
-
-      {/* Tabs */}
-      <div className="border-b border-[var(--color-border)] mb-6">
-        <div className="flex gap-1">
-          <button
-            onClick={() => setActiveTab('code')}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'code'
-                ? 'border-secondary text-secondary'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            <FileText size={16} className="inline mr-2" />
-            Code
-          </button>
-          <button
-            onClick={() => setActiveTab('commits')}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'commits'
-                ? 'border-secondary text-secondary'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            <GitCommit size={16} className="inline mr-2" />
-            Commits
-          </button>
-          <button
-            onClick={() => navigate(`/${owner}/${repo}/pulls`)}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'pulls'
-                ? 'border-secondary text-secondary'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            <GitPullRequest size={16} className="inline mr-2" />
-            Pull Requests
-          </button>
-          <button
-            onClick={() => navigate(`/${owner}/${repo}/issues`)}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'issues'
-                ? 'border-secondary text-secondary'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            <AlertCircle size={16} className="inline mr-2" />
-            Issues
-          </button>
-          <button
-            onClick={() => navigate(`/${owner}/${repo}/releases`)}
-            className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
-              activeTab === 'releases'
-                ? 'border-secondary text-secondary'
-                : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
-            }`}
-          >
-            <Tag size={16} className="inline mr-2" />
-            Releases
-          </button>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'code' && (
-        <div className="space-y-4">
+    <div className="space-y-4">
           {/* Breadcrumb Navigation */}
           {(currentPath || viewingFile) && (
             <div className="px-3">
@@ -507,18 +407,18 @@ export default function RepositoryDetail() {
                 </div>
 
                 {/* Last Commit Info */}
-                {mockStats.lastCommit && (
+                {lastCommit && (
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <p className="text-xs text-[var(--color-text-tertiary)] truncate max-w-md">
-                        {mockStats.lastCommit.message}
+                        {lastCommit.message}
                       </p>
                       <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-                        {mockStats.lastCommit.author} committed {formatDate(mockStats.lastCommit.date)}
+                        {lastCommit.author} committed {formatDate(lastCommit.date)}
                       </p>
                     </div>
                     <code className="text-xs font-mono text-secondary bg-[var(--color-bg-secondary)] px-2 py-1 rounded">
-                      {mockStats.lastCommit.sha.slice(0, 7)}
+                      {lastCommit.sha.slice(0, 7)}
                     </code>
                   </div>
                 )}
@@ -573,32 +473,6 @@ export default function RepositoryDetail() {
               </CardContent>
             </Card>
           )}
-        </div>
-      )}
-
-      {activeTab === 'commits' && (
-        <Card padding="lg">
-          <CardHeader>
-            <CardTitle>Commit History</CardTitle>
-            <CardDescription>
-              {mockStats.commitCount} commits on {currentBranch}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {commits.length === 0 ? (
-              <div className="text-center py-8 text-[var(--color-text-tertiary)]">
-                No commits yet
-              </div>
-            ) : (
-              <div>
-                {commits.map((commit) => (
-                  <CommitItem key={commit.sha} commit={commit} />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-    </Container>
+    </div>
   );
 }

@@ -27,6 +27,12 @@ public class GitService : IGitService
                     
                     // Initialize bare repository
                     Repository.Init(path, isBare: true);
+                    // Set default branch to "main" so HEAD resolves after first push (avoids master/main mismatch)
+                    var headPath = Path.Combine(path, "HEAD");
+                    if (File.Exists(headPath))
+                    {
+                        File.WriteAllText(headPath, "ref: refs/heads/main\n");
+                    }
                     return true;
                 }
                 catch

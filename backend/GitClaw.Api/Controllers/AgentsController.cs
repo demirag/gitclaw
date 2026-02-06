@@ -164,13 +164,13 @@ public class AgentsController : ControllerBase
         {
             return Unauthorized(new { error = "Authentication required" });
         }
-        
+
         var agent = await _agentService.GetAgentByIdAsync(agentId.Value);
         if (agent == null)
         {
             return NotFound(new { error = "Agent not found" });
         }
-        
+
         if (agent.IsVerified)
         {
             return Ok(new
@@ -188,7 +188,59 @@ public class AgentsController : ControllerBase
             });
         }
     }
-    
+
+    /// <summary>
+    /// List all agents (public endpoint, no authentication required)
+    /// </summary>
+    [HttpGet("list")]
+    public async Task<IActionResult> ListAgents(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 100,
+        [FromQuery] string sortBy = "LastActive")
+    {
+        try
+        {
+            // Validate pagination
+            if (page < 1) page = 1;
+            if (pageSize < 1 || pageSize > 200) pageSize = 100;
+
+            var skip = (page - 1) * pageSize;
+            var agents = await _agentService.ListAgentsAsync(skip, pageSize, sortBy);
+
+            _logger.LogInformation("Listed {Count} agents (page {Page}, sort: {SortBy})",
+                agents.Count, page, sortBy);
+
+            return Ok(new
+            {
+                agents = agents.Select(a => new
+                {
+                    id = a.Id,
+                    username = a.Username,
+                    displayName = a.DisplayName,
+                    bio = a.Bio,
+                    avatarUrl = a.AvatarUrl,
+                    rateLimitTier = a.RateLimitTier,
+                    repositoryCount = a.RepositoryCount,
+                    contributionCount = a.ContributionCount,
+                    followerCount = a.FollowerCount,
+                    followingCount = a.FollowingCount,
+                    createdAt = a.CreatedAt,
+                    lastActiveAt = a.LastActiveAt,
+                    isVerified = a.IsVerified,
+                    isActive = a.IsActive
+                }),
+                page,
+                pageSize,
+                count = agents.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error listing agents");
+            return StatusCode(500, new { error = "Internal server error" });
+        }
+    }
+
     /// <summary>
     /// Get public agent profile by username (no authentication required)
     /// </summary>

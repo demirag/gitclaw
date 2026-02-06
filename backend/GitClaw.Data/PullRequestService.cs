@@ -68,11 +68,13 @@ public class PullRequestService : IPullRequestService
     /// </summary>
     public async Task<PullRequest?> GetPullRequestAsync(string owner, string repositoryName, int number)
     {
+        var ownerLower = owner.ToLowerInvariant();
+        var repoLower = repositoryName.ToLowerInvariant();
         return await _dbContext.PullRequests
             .Include(pr => pr.Repository)
             .FirstOrDefaultAsync(pr => 
-                pr.Owner == owner && 
-                pr.RepositoryName == repositoryName && 
+                pr.Owner.ToLower() == ownerLower && 
+                pr.RepositoryName.ToLower() == repoLower && 
                 pr.Number == number);
     }
     
@@ -96,8 +98,10 @@ public class PullRequestService : IPullRequestService
         int skip = 0,
         int take = 30)
     {
+        var ownerLower = owner.ToLowerInvariant();
+        var repoLower = repositoryName.ToLowerInvariant();
         var query = _dbContext.PullRequests
-            .Where(pr => pr.Owner == owner && pr.RepositoryName == repositoryName);
+            .Where(pr => pr.Owner.ToLower() == ownerLower && pr.RepositoryName.ToLower() == repoLower);
         
         if (status.HasValue)
         {

@@ -1,10 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Header from './components/layout/Header';
+import Footer from './components/layout/Footer';
 import Home from './pages/Home';
+import Explore from './pages/Explore';
 import Activity from './pages/Activity';
 import RepositoryList from './pages/RepositoryList';
-import RepositoryDetail from './pages/RepositoryDetail';
+import RepositoryLayout from './pages/RepositoryLayout';
+import RepositoryDetail, { RepositoryCommitsContent } from './pages/RepositoryDetail';
 import PullRequestList from './pages/PullRequestList';
 import PullRequestDetail from './pages/PullRequestDetail';
 import IssueList from './pages/IssueList';
@@ -12,6 +15,8 @@ import IssueDetail from './pages/IssueDetail';
 import ReleaseList from './pages/ReleaseList';
 import ReleaseDetail from './pages/ReleaseDetail';
 import Profile from './pages/Profile';
+import AgentList from './pages/AgentList';
+import Search from './pages/Search';
 import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
@@ -36,31 +41,40 @@ function AppContent() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)]">
+    <div className="min-h-screen flex flex-col bg-[var(--color-bg-primary)]">
       <Header />
-      <Routes>
-        {/* Main Pages */}
-        <Route path="/" element={<Home />} />
-        <Route path="/activity" element={<Activity />} />
-        
-        {/* Repository Routes - Read-only for humans */}
-        <Route path="/repositories" element={<RepositoryList />} />
-        
-        {/* Profile Route */}
-        <Route path="/u/:username" element={<Profile />} />
-        
-        {/* Repository Detail Routes */}
-        <Route path="/:owner/:repo" element={<RepositoryDetail />} />
-        <Route path="/:owner/:repo/pulls" element={<PullRequestList />} />
-        <Route path="/:owner/:repo/pull/:number" element={<PullRequestDetail />} />
-        <Route path="/:owner/:repo/issues" element={<IssueList />} />
-        <Route path="/:owner/:repo/issues/:number" element={<IssueDetail />} />
-        <Route path="/:owner/:repo/releases" element={<ReleaseList />} />
-        <Route path="/:owner/:repo/releases/tag/:tag" element={<ReleaseDetail />} />
-        
-        {/* Fallback route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <main className="flex-1">
+        <Routes>
+          {/* Main Pages */}
+          <Route path="/" element={<Home />} />
+          <Route path="/explore" element={<Explore />} />
+          <Route path="/activity" element={<Activity />} />
+          <Route path="/search" element={<Search />} />
+
+          {/* Repository list and agent list */}
+          <Route path="/repositories" element={<RepositoryList />} />
+          <Route path="/agents" element={<AgentList />} />
+
+          {/* Profile Route */}
+          <Route path="/u/:username" element={<Profile />} />
+
+          {/* Repository routes: shared layout (header, clone URL, tabs) + outlet */}
+          <Route path="/:owner/:repo" element={<RepositoryLayout />}>
+            <Route index element={<RepositoryDetail />} />
+            <Route path="commits" element={<RepositoryCommitsContent />} />
+            <Route path="pulls" element={<PullRequestList />} />
+            <Route path="pull/:number" element={<PullRequestDetail />} />
+            <Route path="issues" element={<IssueList />} />
+            <Route path="issues/:number" element={<IssueDetail />} />
+            <Route path="releases" element={<ReleaseList />} />
+            <Route path="releases/tag/:tag" element={<ReleaseDetail />} />
+          </Route>
+
+          {/* Fallback route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+      <Footer />
     </div>
   );
 }

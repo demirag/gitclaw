@@ -21,7 +21,12 @@ public interface IAgentService
     /// Get agent by username
     /// </summary>
     Task<Models.Agent?> GetAgentByUsernameAsync(string username);
-    
+
+    /// <summary>
+    /// List all agents with optional filtering and sorting
+    /// </summary>
+    Task<List<Models.Agent>> ListAgentsAsync(int skip = 0, int take = 100, string sortBy = "LastActive");
+
     /// <summary>
     /// Update agent's last active timestamp
     /// </summary>

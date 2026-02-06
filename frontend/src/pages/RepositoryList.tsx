@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Search, Star, GitBranch, Clock, Grid3x3, List } from 'lucide-react';
+import { Search, Star, GitBranch, Clock, Grid3x3, List, User } from 'lucide-react';
 import Container from '../components/layout/Container';
-import Card, { CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
+import Card, { CardContent, CardDescription, CardHeader } from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Badge from '../components/ui/Badge';
 import { repoService } from '../services/repoService';
@@ -18,31 +18,17 @@ export default function RepositoryList() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   const { data: repositories = [], isLoading, error } = useQuery({
-    queryKey: ['repositories'],
-    queryFn: repoService.list,
+    queryKey: ['repositories', sortBy],
+    queryFn: () => repoService.list({ sortBy }),
   });
 
-  // Filter and sort repositories
+  // Client-side filter only (for search)
   const filteredRepos = repositories
     .filter((repo) =>
       repo.name.toLowerCase().includes(search.toLowerCase()) ||
       repo.description.toLowerCase().includes(search.toLowerCase()) ||
       repo.owner.toLowerCase().includes(search.toLowerCase())
-    )
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'stars':
-          return b.starCount - a.starCount;
-        case 'updated':
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-        case 'created':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case 'name':
-          return a.name.localeCompare(b.name);
-        default:
-          return 0;
-      }
-    });
+    );
 
   const formatDate = (date: string) => {
     const now = new Date();
@@ -66,67 +52,65 @@ export default function RepositoryList() {
 
   const RepositoryCard = ({ repo }: { repo: Repository }) => (
     <Card hover padding="md">
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="truncate">
-              <Link 
-                to={`/u/${repo.owner}`} 
-                className="text-secondary hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {repo.owner}
-              </Link>
-              <span className="text-[var(--color-text-tertiary)]"> / </span>
-              <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
-                {repo.name}
-              </Link>
-            </CardTitle>
+      <CardHeader className="mb-2">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <Link
+            to={`/u/${repo.owner}`}
+            className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-primary hover:underline min-w-0 truncate"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <User size={14} className="shrink-0 text-[var(--color-text-tertiary)]" />
+            <span className="truncate">{repo.owner}</span>
+          </Link>
+          <div className="flex shrink-0 items-center gap-1.5">
             {repo.isPrivate && (
-              <Badge variant="warning" size="sm" className="ml-2">
+              <Badge variant="warning" size="sm">
                 Private
               </Badge>
             )}
             {repo.isArchived && (
-              <Badge variant="default" size="sm" className="ml-2">
+              <Badge variant="default" size="sm">
                 Archived
               </Badge>
             )}
           </div>
         </div>
+        <p className="text-base font-semibold text-[var(--color-text-primary)] truncate">
+          <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
+            {repo.name}
+          </Link>
+        </p>
       </CardHeader>
 
-      <CardContent>
-        <Link to={`/${repo.owner}/${repo.name}`}>
+      <CardContent className="pt-0">
+        <Link to={`/${repo.owner}/${repo.name}`} className="block">
           {repo.description && (
-            <CardDescription className="mb-4 line-clamp-2">
+            <CardDescription className="mb-3 line-clamp-2 text-[var(--color-text-secondary)]">
               {repo.description}
             </CardDescription>
           )}
 
-          <div className="flex items-center gap-4 text-sm text-[var(--color-text-tertiary)]">
-            <div className="flex items-center gap-1">
-              <Star size={14} />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--color-text-tertiary)]">
+            <span className="inline-flex items-center gap-1">
+              <Star size={14} className="shrink-0" />
               <span>{repo.starCount}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <GitBranch size={14} />
-              <span>{repo.branchCount}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock size={14} />
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <GitBranch size={14} className="shrink-0" />
+              <span>{repo.branchCount} branches</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Clock size={14} className="shrink-0" />
               <span>{formatDate(repo.updatedAt)}</span>
-            </div>
+            </span>
+            {repo.language && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" />
+                <span>{repo.language}</span>
+              </span>
+            )}
+            <span>{formatSize(repo.size)}</span>
           </div>
-
-          {repo.language && (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="inline-block w-3 h-3 rounded-full bg-primary"></span>
-              <span className="text-sm text-[var(--color-text-secondary)]">{repo.language}</span>
-              <span className="text-sm text-[var(--color-text-tertiary)]">•</span>
-              <span className="text-sm text-[var(--color-text-tertiary)]">{formatSize(repo.size)}</span>
-            </div>
-          )}
         </Link>
       </CardContent>
     </Card>
@@ -136,53 +120,53 @@ export default function RepositoryList() {
     <Card hover padding="md" className="mb-3">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-lg font-semibold text-[var(--color-text-primary)] truncate">
-              <Link 
-                to={`/u/${repo.owner}`} 
-                className="text-secondary hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {repo.owner}
-              </Link>
-              <span className="text-[var(--color-text-tertiary)]"> / </span>
-              <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
-                {repo.name}
-              </Link>
-            </h3>
-            {repo.isPrivate && <Badge variant="warning" size="sm">Private</Badge>}
-            {repo.isArchived && <Badge variant="default" size="sm">Archived</Badge>}
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <Link
+              to={`/u/${repo.owner}`}
+              className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-primary hover:underline min-w-0 truncate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <User size={14} className="shrink-0 text-[var(--color-text-tertiary)]" />
+              <span className="truncate">{repo.owner}</span>
+            </Link>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {repo.isPrivate && <Badge variant="warning" size="sm">Private</Badge>}
+              {repo.isArchived && <Badge variant="default" size="sm">Archived</Badge>}
+            </div>
           </div>
-          
+          <p className="text-base font-semibold text-[var(--color-text-primary)] truncate mb-2">
+            <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
+              {repo.name}
+            </Link>
+          </p>
+
           <Link to={`/${repo.owner}/${repo.name}`}>
             {repo.description && (
-              <p className="text-sm text-[var(--color-text-tertiary)] mb-3 line-clamp-1">
+              <p className="text-sm text-[var(--color-text-secondary)] mb-3 line-clamp-1">
                 {repo.description}
               </p>
             )}
 
-            <div className="flex items-center gap-4 text-sm text-[var(--color-text-tertiary)]">
-              {repo.language && (
-                <div className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full bg-primary"></span>
-                  <span>{repo.language}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-1">
-                <Star size={14} />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--color-text-tertiary)]">
+              <span className="inline-flex items-center gap-1">
+                <Star size={14} className="shrink-0" />
                 <span>{repo.starCount}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <GitBranch size={14} />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <GitBranch size={14} className="shrink-0" />
                 <span>{repo.branchCount} branches</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span>{formatSize(repo.size)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Clock size={14} />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Clock size={14} className="shrink-0" />
                 <span>Updated {formatDate(repo.updatedAt)}</span>
-              </div>
+              </span>
+              {repo.language && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" />
+                  <span>{repo.language}</span>
+                </span>
+              )}
+              <span>{formatSize(repo.size)}</span>
             </div>
           </Link>
         </div>

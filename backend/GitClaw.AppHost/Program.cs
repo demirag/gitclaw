@@ -2,7 +2,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 // Add PostgreSQL database
 var postgres = builder.AddPostgres("postgres")
-    .WithPgAdmin()
+    //.WithPgAdmin()
     .AddDatabase("gitclaw");
 
 // Add GitClaw API

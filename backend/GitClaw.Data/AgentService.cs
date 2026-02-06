@@ -141,7 +141,31 @@ public class AgentService : IAgentService
         return await _dbContext.Agents
             .FirstOrDefaultAsync(a => a.Username.ToLower() == normalizedUsername);
     }
-    
+
+    /// <summary>
+    /// List all agents with optional filtering and sorting
+    /// </summary>
+    public async Task<List<Agent>> ListAgentsAsync(int skip = 0, int take = 100, string sortBy = "LastActive")
+    {
+        var query = _dbContext.Agents.AsQueryable();
+
+        // Sort agents
+        query = sortBy.ToLower() switch
+        {
+            "username" => query.OrderBy(a => a.Username),
+            "repositories" => query.OrderByDescending(a => a.RepositoryCount),
+            "contributions" => query.OrderByDescending(a => a.ContributionCount),
+            "followers" => query.OrderByDescending(a => a.FollowerCount),
+            "created" => query.OrderByDescending(a => a.CreatedAt),
+            _ => query.OrderByDescending(a => a.LastActiveAt)
+        };
+
+        return await query
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+    }
+
     /// <summary>
     /// Update agent's last active timestamp
     /// </summary>

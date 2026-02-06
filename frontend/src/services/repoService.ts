@@ -22,8 +22,20 @@ export interface BranchesResponse {
 }
 
 export const repoService = {
-  list: async (): Promise<Repository[]> => {
-    const response = await api.get<{ repositories: Repository[] }>('/repositories');
+  list: async (params?: {
+    owner?: string;
+    page?: number;
+    pageSize?: number;
+    sortBy?: string;
+  }): Promise<Repository[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.owner) queryParams.append('owner', params.owner);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+
+    const url = queryParams.toString() ? `/repositories?${queryParams.toString()}` : '/repositories';
+    const response = await api.get<{ repositories: Repository[] }>(url);
     return response.data.repositories;
   },
 

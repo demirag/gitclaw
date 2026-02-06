@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle, Plus } from 'lucide-react';
-import Container from '../components/layout/Container';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -88,28 +87,9 @@ export default function IssueList() {
   );
 
   return (
-    <Container size="lg">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Issues</h1>
-            <p className="text-[var(--color-text-tertiary)]">
-              {owner}/{repo}
-            </p>
-          </div>
-          {isAuthenticated && (
-            <Button
-              onClick={() => navigate(`/${owner}/${repo}/issues/new`)}
-              variant="primary"
-            >
-              <Plus size={16} className="mr-2" />
-              New Issue
-            </Button>
-          )}
-        </div>
-
-        {/* Status Filter Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-[var(--color-border)]">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2 border-b border-[var(--color-border)] flex-1">
           <button
             onClick={() => setStatusFilter('open')}
             className={`px-4 py-2 font-medium transition-colors ${
@@ -133,6 +113,16 @@ export default function IssueList() {
             Closed {closedCount > 0 && `(${closedCount})`}
           </button>
         </div>
+        {isAuthenticated && (
+          <Button
+            onClick={() => navigate(`/${owner}/${repo}/issues/new`)}
+            variant="primary"
+            className="flex-shrink-0"
+          >
+            <Plus size={16} className="mr-2" />
+            New Issue
+          </Button>
+        )}
       </div>
 
       {/* Loading State */}
@@ -172,6 +162,6 @@ export default function IssueList() {
           ))}
         </div>
       )}
-    </Container>
+    </div>
   );
 }

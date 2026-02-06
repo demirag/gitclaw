@@ -127,7 +127,7 @@ public class PullRequestsController : ControllerBase
             // Validate pagination
             if (page < 1) page = 1;
             if (pageSize < 1 || pageSize > 100) pageSize = 30;
-            
+
             // Parse status filter
             PullRequestStatus? statusFilter = null;
             if (!string.IsNullOrEmpty(status))
@@ -137,7 +137,7 @@ public class PullRequestsController : ControllerBase
                     statusFilter = parsedStatus;
                 }
             }
-            
+
             var skip = (page - 1) * pageSize;
             var pullRequests = await _pullRequestService.ListPullRequestsAsync(
                 owner,
@@ -145,29 +145,64 @@ public class PullRequestsController : ControllerBase
                 statusFilter,
                 skip,
                 pageSize);
-            
+
+            // Get repository path for calculating diff stats
+            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
+            var repoExists = await _gitService.RepositoryExistsAsync(repoPath);
+
             return Ok(new
             {
-                pullRequests = pullRequests.Select(pr => new
+                pullRequests = pullRequests.Select(pr =>
                 {
-                    id = pr.Id,
-                    number = pr.Number,
-                    title = pr.Title,
-                    description = pr.Description,
-                    status = pr.Status.ToString().ToLower(),
-                    sourceBranch = pr.SourceBranch,
-                    targetBranch = pr.TargetBranch,
-                    author = new
+                    // Calculate diff stats for each PR
+                    int fileChangeCount = 0;
+                    int additions = 0;
+                    int deletions = 0;
+
+                    if (repoExists)
                     {
-                        id = pr.AuthorId,
-                        name = pr.AuthorName
-                    },
-                    isMergeable = pr.IsMergeable,
-                    hasConflicts = pr.HasConflicts,
-                    createdAt = pr.CreatedAt,
-                    updatedAt = pr.UpdatedAt,
-                    mergedAt = pr.MergedAt,
-                    closedAt = pr.ClosedAt
+                        try
+                        {
+                            var diff = _gitService.GetDiffBetweenBranchesAsync(
+                                repoPath,
+                                pr.SourceBranch,
+                                pr.TargetBranch).GetAwaiter().GetResult();
+
+                            fileChangeCount = diff.TotalFilesChanged;
+                            additions = diff.TotalAdditions;
+                            deletions = diff.TotalDeletions;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to get diff stats for PR #{Number}", pr.Number);
+                            // Continue with 0 values
+                        }
+                    }
+
+                    return new
+                    {
+                        id = pr.Id,
+                        number = pr.Number,
+                        title = pr.Title,
+                        description = pr.Description,
+                        status = pr.Status.ToString().ToLower(),
+                        sourceBranch = pr.SourceBranch,
+                        targetBranch = pr.TargetBranch,
+                        author = new
+                        {
+                            id = pr.AuthorId,
+                            name = pr.AuthorName
+                        },
+                        isMergeable = pr.IsMergeable,
+                        hasConflicts = pr.HasConflicts,
+                        fileChangeCount,
+                        additions,
+                        deletions,
+                        createdAt = pr.CreatedAt,
+                        updatedAt = pr.UpdatedAt,
+                        mergedAt = pr.MergedAt,
+                        closedAt = pr.ClosedAt
+                    };
                 }),
                 page,
                 pageSize,

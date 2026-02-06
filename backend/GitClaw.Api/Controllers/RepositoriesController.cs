@@ -679,7 +679,7 @@ public class RepositoriesController : ControllerBase
         string owner,
         string name,
         string path,
-        [FromQuery] string? ref_ = null)
+        [FromQuery(Name = "ref")] string? ref_ = null)
     {
         try
         {
@@ -708,8 +708,13 @@ public class RepositoriesController : ControllerBase
                 return NotFound(new { error = $"Reference '{reference}' not found" });
             }
             
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return NotFound(new { error = "File path is required" });
+            }
+            
             var tree = commit.Tree;
-            var targetPath = path.Trim('/');
+            var targetPath = path.Trim().Trim('/').Replace('\\', '/');
             var treeEntry = tree[targetPath];
             
             if (treeEntry == null || treeEntry.TargetType != LibGit2Sharp.TreeEntryTargetType.Blob)

@@ -88,6 +88,8 @@ public class RepositoryService : IRepositoryService
             "name" => query.OrderBy(r => r.Name),
             "owner" => query.OrderBy(r => r.Owner),
             "updated" => query.OrderByDescending(r => r.UpdatedAt),
+            "created" => query.OrderByDescending(r => r.CreatedAt),
+            "stars" => query.OrderByDescending(r => r.StarCount),
             _ => query.OrderByDescending(r => r.CreatedAt)
         };
         

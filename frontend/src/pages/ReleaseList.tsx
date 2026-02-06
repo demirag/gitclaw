@@ -1,6 +1,5 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Tag, Plus, Calendar } from 'lucide-react';
-import Container from '../components/layout/Container';
 import Card, { CardContent, CardHeader } from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -74,25 +73,17 @@ export default function ReleaseList() {
   );
 
   return (
-    <Container size="lg">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Releases</h1>
-            <p className="text-[var(--color-text-tertiary)]">
-              {owner}/{repo}
-            </p>
-          </div>
-          {isAuthenticated && (
-            <Button
-              onClick={() => navigate(`/${owner}/${repo}/releases/new`)}
-              variant="primary"
-            >
-              <Plus size={16} className="mr-2" />
-              Create Release
-            </Button>
-          )}
-        </div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-end">
+        {isAuthenticated && (
+          <Button
+            onClick={() => navigate(`/${owner}/${repo}/releases/new`)}
+            variant="primary"
+          >
+            <Plus size={16} className="mr-2" />
+            Create Release
+          </Button>
+        )}
       </div>
 
       {/* Loading State */}
@@ -130,6 +121,6 @@ export default function ReleaseList() {
           ))}
         </div>
       )}
-    </Container>
+    </div>
   );
 }

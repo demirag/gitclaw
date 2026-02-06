@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { GitPullRequest, GitMerge, XCircle, MessageSquare, FileCode } from 'lucide-react';
-import Container from '../components/layout/Container';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import api from '../lib/api';
@@ -14,8 +13,28 @@ export default function PullRequestList() {
   const { owner, repo } = useParams<{ owner: string; repo: string }>();
   const [statusFilter, setStatusFilter] = useState<PRStatus>('open');
 
+  // Fetch PRs with backend filtering
   const { data: pullRequests = [], isLoading } = useQuery({
-    queryKey: ['pullRequests', owner, repo],
+    queryKey: ['pullRequests', owner, repo, statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+      const url = params.toString()
+        ? `/repositories/${owner}/${repo}/pulls?${params.toString()}`
+        : `/repositories/${owner}/${repo}/pulls`;
+      const response = await api.get<{ pullRequests: PullRequest[] }>(url);
+      return response.data.pullRequests;
+    },
+    enabled: !!owner && !!repo,
+    refetchOnWindowFocus: true,
+    staleTime: 30000,
+  });
+
+  // Fetch counts for all statuses
+  const { data: allPRs = [] } = useQuery({
+    queryKey: ['pullRequests', owner, repo, 'all'],
     queryFn: async () => {
       const response = await api.get<{ pullRequests: PullRequest[] }>(
         `/repositories/${owner}/${repo}/pulls`
@@ -23,20 +42,14 @@ export default function PullRequestList() {
       return response.data.pullRequests;
     },
     enabled: !!owner && !!repo,
-    refetchOnWindowFocus: true, // Refetch when user returns to tab
-    staleTime: 30000, // Consider data stale after 30 seconds
-  });
-
-  const filteredPRs = pullRequests.filter((pr) => {
-    if (statusFilter === 'all') return true;
-    return pr.status === statusFilter;
+    staleTime: 30000,
   });
 
   const counts = {
-    all: pullRequests.length,
-    open: pullRequests.filter((pr) => pr.status === 'open').length,
-    closed: pullRequests.filter((pr) => pr.status === 'closed').length,
-    merged: pullRequests.filter((pr) => pr.status === 'merged').length,
+    all: allPRs.length,
+    open: allPRs.filter((pr) => pr.status === 'open').length,
+    closed: allPRs.filter((pr) => pr.status === 'closed').length,
+    merged: allPRs.filter((pr) => pr.status === 'merged').length,
   };
 
   const formatDate = (date: string) => {
@@ -150,24 +163,9 @@ export default function PullRequestList() {
   );
 
   return (
-    <Container className="py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)] mb-2">
-              Pull Requests
-            </h1>
-            <p className="text-[var(--color-text-secondary)]">
-              <Link to={`/${owner}`} className="hover:underline">{owner}</Link>
-              {' / '}
-              <Link to={`/${owner}/${repo}`} className="hover:underline">{repo}</Link>
-            </p>
-          </div>
-        </div>
-
-        {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 border-b border-[var(--color-border)]">
+    <div className="space-y-4">
+      {/* Status Filter Tabs */}
+      <div className="flex items-center gap-1 border-b border-[var(--color-border)]">
           {(['all', 'open', 'closed', 'merged'] as PRStatus[]).map((status) => (
             <button
               key={status}
@@ -181,7 +179,6 @@ export default function PullRequestList() {
               {status} ({counts[status]})
             </button>
           ))}
-        </div>
       </div>
 
       {/* Loading State */}
@@ -192,7 +189,7 @@ export default function PullRequestList() {
       )}
 
       {/* Empty State */}
-      {!isLoading && filteredPRs.length === 0 && (
+      {!isLoading && pullRequests.length === 0 && (
         <Card padding="lg">
           <div className="text-center py-8">
             <GitPullRequest size={48} className="mx-auto mb-4 text-[var(--color-text-tertiary)]" />
@@ -209,13 +206,13 @@ export default function PullRequestList() {
       )}
 
       {/* Pull Request List */}
-      {!isLoading && filteredPRs.length > 0 && (
+      {!isLoading && pullRequests.length > 0 && (
         <div>
-          {filteredPRs.map((pr) => (
+          {pullRequests.map((pr) => (
             <PullRequestCard key={pr.id} pr={pr} />
           ))}
         </div>
       )}
-    </Container>
+    </div>
   );
 }
