@@ -1,8 +1,14 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Add PostgreSQL database
-var postgres = builder.AddPostgres("postgres")
-    //.WithPgAdmin()
+// Add Azure PostgreSQL Flexible Server with password authentication
+// - Local development: runs as a Docker container via RunAsContainer()
+// - Azure deployment: provisions an Azure PostgreSQL Flexible Server
+var username = builder.AddParameter("pg-username", secret: true);
+var password = builder.AddParameter("pg-password", secret: true);
+
+var postgres = builder.AddAzurePostgresFlexibleServer("postgres")
+    .WithPasswordAuthentication(username, password)
+    .RunAsContainer()
     .AddDatabase("gitclaw");
 
 // Add GitClaw API - runs as .NET project in development
