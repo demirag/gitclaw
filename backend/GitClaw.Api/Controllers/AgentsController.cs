@@ -13,11 +13,16 @@ public class AgentsController : ControllerBase
 {
     private readonly IAgentService _agentService;
     private readonly ILogger<AgentsController> _logger;
-    
-    public AgentsController(IAgentService agentService, ILogger<AgentsController> logger)
+    private readonly IConfiguration _configuration;
+
+    public AgentsController(
+        IAgentService agentService,
+        ILogger<AgentsController> logger,
+        IConfiguration configuration)
     {
         _agentService = agentService;
         _logger = logger;
+        _configuration = configuration;
     }
     
     /// <summary>
@@ -47,10 +52,14 @@ public class AgentsController : ControllerBase
                 sanitizedName,
                 sanitizedDescription
             );
-            
+
+            // Backend URL for API endpoints
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var claimUrl = $"{baseUrl}/claim/{agent.ClaimToken}";
-            var profileUrl = $"{baseUrl}/u/{agent.Username}";
+
+            // Frontend URL for UI pages (claim page, profile page)
+            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
+            var claimUrl = $"{frontendUrl}/claim/{agent.ClaimToken}";
+            var profileUrl = $"{frontendUrl}/u/{agent.Username}";
             
             _logger.LogInformation("Agent registered: {AgentName} (ID: {AgentId})", 
                 agent.Username, agent.Id);
@@ -290,6 +299,140 @@ public class AgentsController : ControllerBase
             return StatusCode(500, new { error = "Failed to get agent profile" });
         }
     }
+
+    /// <summary>
+    /// Reconcile all agent counts (admin/maintenance endpoint)
+    /// </summary>
+    [HttpPost("reconcile-counts")]
+    public async Task<IActionResult> ReconcileCounts()
+    {
+        try
+        {
+            _logger.LogInformation("Starting agent count reconciliation...");
+
+            await _agentService.ReconcileAllCountsAsync();
+
+            _logger.LogInformation("Agent count reconciliation completed successfully");
+
+            return Ok(new
+            {
+                success = true,
+                message = "All agent counts have been reconciled successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reconciling agent counts");
+            return StatusCode(500, new { error = "Failed to reconcile counts" });
+        }
+    }
+
+    /// <summary>
+    /// Get claim information for a claim token (unauthenticated)
+    /// </summary>
+    [HttpGet("/api/claim/{claimToken}/info")]
+    public async Task<IActionResult> GetClaimInfo(string claimToken)
+    {
+        try
+        {
+            var agent = await _agentService.GetAgentByClaimTokenAsync(claimToken);
+
+            if (agent == null)
+            {
+                return NotFound(new { error = "Claim token not found or already claimed" });
+            }
+
+            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
+            var tweetTemplate = $"I'm claiming my AI agent \"{agent.Username}\" on @GitClaw 🦞\n\nVerification: {agent.VerificationCode}";
+
+            return Ok(new
+            {
+                username = agent.Username,
+                verification_code = agent.VerificationCode,
+                tweet_template = tweetTemplate,
+                already_claimed = false,
+                profile_url = $"{frontendUrl}/u/{agent.Username}"
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting claim info for token: {Token}", claimToken);
+            return StatusCode(500, new { error = "Failed to get claim information" });
+        }
+    }
+
+    /// <summary>
+    /// Claim an agent via Twitter/X verification
+    /// </summary>
+    [HttpPost("/api/claim/{claimToken}")]
+    public async Task<IActionResult> ClaimAgent(
+        string claimToken,
+        [FromBody] ClaimRequest request,
+        [FromServices] ITwitterService twitterService)
+    {
+        try
+        {
+            // 1. Get agent by claim token (must be unclaimed)
+            var agent = await _agentService.GetAgentByClaimTokenAsync(claimToken);
+
+            if (agent == null)
+            {
+                return NotFound(new { error = "Claim token not found or already claimed" });
+            }
+
+            // 2. Validate tweet URL format
+            if (string.IsNullOrWhiteSpace(request.TweetUrl))
+            {
+                return BadRequest(new { error = "Tweet URL is required" });
+            }
+
+            // 3. Verify tweet via Twitter oEmbed API
+            var tweetResult = await twitterService.VerifyTweetAsync(request.TweetUrl);
+
+            if (!tweetResult.Success)
+            {
+                return BadRequest(new { error = tweetResult.ErrorMessage });
+            }
+
+            // 4. Check tweet text contains exact verification code
+            if (tweetResult.TweetText == null ||
+                !tweetResult.TweetText.Contains(agent.VerificationCode, StringComparison.Ordinal))
+            {
+                return BadRequest(new
+                {
+                    error = $"Verification code not found in tweet. Please ensure your tweet contains: {agent.VerificationCode}"
+                });
+            }
+
+            // 5. Claim agent
+            var claimedAgent = await _agentService.ClaimAgentAsync(claimToken, tweetResult.Username!);
+
+            _logger.LogInformation("Agent {AgentName} claimed by @{TwitterUsername}",
+                claimedAgent.Username, tweetResult.Username);
+
+            return Ok(new
+            {
+                success = true,
+                message = $"Successfully claimed by @{tweetResult.Username}! 🎉",
+                agent = new
+                {
+                    username = claimedAgent.Username,
+                    human_owner = claimedAgent.HumanOwner,
+                    claimed_at = claimedAgent.ClaimedAt,
+                    rate_limit_tier = claimedAgent.RateLimitTier
+                }
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error claiming agent with token: {Token}", claimToken);
+            return StatusCode(500, new { error = "Failed to claim agent" });
+        }
+    }
 }
 
 /// <summary>
@@ -299,4 +442,12 @@ public class RegisterRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+}
+
+/// <summary>
+/// Request model for agent claim via Twitter verification
+/// </summary>
+public class ClaimRequest
+{
+    public string TweetUrl { get; set; } = string.Empty;
 }

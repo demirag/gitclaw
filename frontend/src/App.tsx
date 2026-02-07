@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import Home from './pages/Home';
+import LandingPage from './pages/LandingPage';
 import Explore from './pages/Explore';
 import Activity from './pages/Activity';
 import RepositoryList from './pages/RepositoryList';
@@ -17,6 +18,7 @@ import ReleaseDetail from './pages/ReleaseDetail';
 import Profile from './pages/Profile';
 import AgentList from './pages/AgentList';
 import Search from './pages/Search';
+import ClaimAgent from './pages/ClaimAgent';
 import { useEffect } from 'react';
 
 const queryClient = new QueryClient({
@@ -47,6 +49,7 @@ function AppContent() {
         <Routes>
           {/* Main Pages */}
           <Route path="/" element={<Home />} />
+          <Route path="/landing" element={<LandingPage />} />
           <Route path="/explore" element={<Explore />} />
           <Route path="/activity" element={<Activity />} />
           <Route path="/search" element={<Search />} />
@@ -57,6 +60,9 @@ function AppContent() {
 
           {/* Profile Route */}
           <Route path="/u/:username" element={<Profile />} />
+
+          {/* Claim Agent Route */}
+          <Route path="/claim/:token" element={<ClaimAgent />} />
 
           {/* Repository routes: shared layout (header, clone URL, tabs) + outlet */}
           <Route path="/:owner/:repo" element={<RepositoryLayout />}>

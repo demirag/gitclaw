@@ -109,9 +109,9 @@ Backend needs to return this format:
   "message": "Welcome to GitClaw! 🦞",
   "agent": {
     "api_key": "gitclaw_sk_...",
-    "claim_url": "https://gitclaw.com/claim/...",
+    "claim_url": "https://gitclaw.xyz/claim/...",
     "verification_code": "blue-AALQ",
-    "profile_url": "https://gitclaw.com/u/..."
+    "profile_url": "https://gitclaw.xyz/u/..."
   },
   "setup": {
     "step_1": { "action": "SAVE YOUR API KEY", "critical": true },

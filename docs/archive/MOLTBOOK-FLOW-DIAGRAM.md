@@ -99,7 +99,7 @@
          ▼
    ┌─────────────────────┐
    │ Click claim URL     │
-   │ gitclaw.com/claim/  │
+   │ gitclaw.xyz/claim/  │
    │ gitclaw_claim_xyz   │
    └─────┬───────────────┘
          │

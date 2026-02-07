@@ -393,27 +393,43 @@ public class PullRequestsController : ControllerBase
             // Get authenticated agent
             var agentId = HttpContext.Items["AgentId"] as Guid?;
             var agent = HttpContext.Items["Agent"] as Agent;
-            
+
             if (agentId == null || agent == null)
             {
                 return Unauthorized(new { error = "Authentication required" });
             }
-            
+
+            // Get repository to check ownership
+            var repository = await _repositoryService.GetRepositoryAsync(owner, repo);
+            if (repository == null)
+            {
+                return NotFound(new { error = "Repository not found" });
+            }
+
+            // Authorization check: Only repository owner can merge PRs
+            if (repository.Owner != agent.Username)
+            {
+                return StatusCode(403, new {
+                    error = "Forbidden",
+                    details = "Only the repository owner can merge pull requests"
+                });
+            }
+
             var (success, error) = await _pullRequestService.MergePullRequestAsync(
                 owner,
                 repo,
                 number,
                 agentId.Value,
                 agent.Username);
-            
+
             if (!success)
             {
                 return BadRequest(new { error });
             }
-            
+
             _logger.LogInformation("Merged pull request #{Number} for {Owner}/{Repo} by {Agent}",
                 number, owner, repo, agent.Username);
-            
+
             return Ok(new
             {
                 message = "Pull request merged successfully",
@@ -437,16 +453,51 @@ public class PullRequestsController : ControllerBase
     {
         try
         {
+            // Get authenticated agent
+            var agentId = HttpContext.Items["AgentId"] as Guid?;
+            var agent = HttpContext.Items["Agent"] as Agent;
+
+            if (agentId == null || agent == null)
+            {
+                return Unauthorized(new { error = "Authentication required" });
+            }
+
+            // Get repository to check ownership
+            var repository = await _repositoryService.GetRepositoryAsync(owner, repo);
+            if (repository == null)
+            {
+                return NotFound(new { error = "Repository not found" });
+            }
+
+            // Get pull request to check authorship
+            var pullRequest = await _pullRequestService.GetPullRequestAsync(owner, repo, number);
+            if (pullRequest == null)
+            {
+                return NotFound(new { error = "Pull request not found" });
+            }
+
+            // Authorization check: Only repository owner OR PR author can close
+            bool isRepoOwner = repository.Owner == agent.Username;
+            bool isPRAuthor = pullRequest.AuthorId == agentId.Value;
+
+            if (!isRepoOwner && !isPRAuthor)
+            {
+                return StatusCode(403, new {
+                    error = "Forbidden",
+                    details = "Only the repository owner or pull request author can close this pull request"
+                });
+            }
+
             var success = await _pullRequestService.ClosePullRequestAsync(owner, repo, number);
-            
+
             if (!success)
             {
                 return NotFound(new { error = "Pull request not found or already closed" });
             }
-            
-            _logger.LogInformation("Closed pull request #{Number} for {Owner}/{Repo}",
-                number, owner, repo);
-            
+
+            _logger.LogInformation("Closed pull request #{Number} for {Owner}/{Repo} by {Agent}",
+                number, owner, repo, agent.Username);
+
             return Ok(new
             {
                 message = "Pull request closed successfully",

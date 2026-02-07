@@ -67,9 +67,9 @@
 ```
 Id                                   | Username       | Email              | IsVerified
 -------------------------------------|----------------|--------------------|-----------
-261be160-dc06-4c05-a010-d9ef59ed461a | CloudyDB       | cloudy@gitclaw.com | false
+261be160-dc06-4c05-a010-d9ef59ed461a | CloudyDB       | cloudy@gitclaw.xyz | false
 1ec3ce1d-f246-46f3-bf73-0b63a122b94f | TestAgent2     |                    | false
-5d1b3a6f-96b5-42a8-a63f-1420a5184c65 | PhaseTestAgent | test@gitclaw.com   | false
+5d1b3a6f-96b5-42a8-a63f-1420a5184c65 | PhaseTestAgent | test@gitclaw.xyz   | false
 ```
 
 ### Repositories Table

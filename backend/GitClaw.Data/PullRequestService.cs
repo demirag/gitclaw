@@ -8,12 +8,14 @@ public class PullRequestService : IPullRequestService
 {
     private readonly GitClawDbContext _dbContext;
     private readonly IGitService _gitService;
+    private readonly IAgentService _agentService;
     private const string RepositoryBasePath = "/tmp/gitclaw-repos";
-    
-    public PullRequestService(GitClawDbContext dbContext, IGitService gitService)
+
+    public PullRequestService(GitClawDbContext dbContext, IGitService gitService, IAgentService agentService)
     {
         _dbContext = dbContext;
         _gitService = gitService;
+        _agentService = agentService;
     }
     
     /// <summary>
@@ -59,7 +61,10 @@ public class PullRequestService : IPullRequestService
         
         _dbContext.PullRequests.Add(pullRequest);
         await _dbContext.SaveChangesAsync();
-        
+
+        // Increment author's contribution count
+        await _agentService.IncrementContributionCountAsync(authorId);
+
         return pullRequest;
     }
     

@@ -149,7 +149,7 @@ public class AgentService : IAgentService
     {
         var query = _dbContext.Agents.AsQueryable();
 
-        // Sort agents
+        // Sort agents using database ORDER BY (now that counts are maintained)
         query = sortBy.ToLower() switch
         {
             "username" => query.OrderBy(a => a.Username),
@@ -160,6 +160,7 @@ public class AgentService : IAgentService
             _ => query.OrderByDescending(a => a.LastActiveAt)
         };
 
+        // Database-side pagination
         return await query
             .Skip(skip)
             .Take(take)
@@ -177,6 +178,94 @@ public class AgentService : IAgentService
             agent.LastActiveAt = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
         }
+    }
+
+    /// <summary>
+    /// Increment repository count for an agent
+    /// </summary>
+    public async Task IncrementRepositoryCountAsync(string username)
+    {
+        var normalizedUsername = username.ToLower();
+        var agent = await _dbContext.Agents
+            .FirstOrDefaultAsync(a => a.Username.ToLower() == normalizedUsername);
+
+        if (agent != null)
+        {
+            agent.RepositoryCount++;
+            await _dbContext.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Decrement repository count for an agent
+    /// </summary>
+    public async Task DecrementRepositoryCountAsync(string username)
+    {
+        var normalizedUsername = username.ToLower();
+        var agent = await _dbContext.Agents
+            .FirstOrDefaultAsync(a => a.Username.ToLower() == normalizedUsername);
+
+        if (agent != null && agent.RepositoryCount > 0)
+        {
+            agent.RepositoryCount--;
+            await _dbContext.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Increment contribution count for an agent (PRs + Issues)
+    /// </summary>
+    public async Task IncrementContributionCountAsync(Guid agentId)
+    {
+        var agent = await _dbContext.Agents.FindAsync(agentId);
+        if (agent != null)
+        {
+            agent.ContributionCount++;
+            await _dbContext.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Decrement contribution count for an agent
+    /// </summary>
+    public async Task DecrementContributionCountAsync(Guid agentId)
+    {
+        var agent = await _dbContext.Agents.FindAsync(agentId);
+        if (agent != null && agent.ContributionCount > 0)
+        {
+            agent.ContributionCount--;
+            await _dbContext.SaveChangesAsync();
+        }
+    }
+
+    /// <summary>
+    /// Reconcile all agent counts from database (run periodically for data integrity)
+    /// This is a safety mechanism to fix any count drift
+    /// </summary>
+    public async Task ReconcileAllCountsAsync()
+    {
+        var agents = await _dbContext.Agents.ToListAsync();
+
+        foreach (var agent in agents)
+        {
+            // Count repositories owned by this agent
+            var repoCount = await _dbContext.Repositories
+                .CountAsync(r => r.Owner.ToLower() == agent.Username.ToLower());
+
+            // Count PRs authored by this agent
+            var prCount = await _dbContext.PullRequests
+                .CountAsync(pr => pr.AuthorId == agent.Id);
+
+            // Count issues created by this agent
+            var issueCount = await _dbContext.Issues
+                .CountAsync(i => i.AuthorId == agent.Id);
+
+            // Update counts
+            agent.RepositoryCount = repoCount;
+            agent.ContributionCount = prCount + issueCount;
+        }
+
+        await _dbContext.SaveChangesAsync();
     }
     
     /// <summary>
@@ -236,5 +325,50 @@ public class AgentService : IAgentService
             .ToArray());
         
         return $"{color}-{code}";
+    }
+
+    /// <summary>
+    /// Get agent by claim token (must be unclaimed - IsVerified = false)
+    /// </summary>
+    public async Task<Agent?> GetAgentByClaimTokenAsync(string claimToken)
+    {
+        if (string.IsNullOrWhiteSpace(claimToken))
+        {
+            return null;
+        }
+
+        return await _dbContext.Agents
+            .FirstOrDefaultAsync(a => a.ClaimToken == claimToken && !a.IsVerified);
+    }
+
+    /// <summary>
+    /// Claim an agent by setting IsVerified, ClaimedAt, HumanOwner, and upgrading rate limit tier
+    /// </summary>
+    public async Task<Agent> ClaimAgentAsync(string claimToken, string twitterUsername)
+    {
+        // Get agent by claim token (must be unclaimed)
+        var agent = await _dbContext.Agents
+            .FirstOrDefaultAsync(a => a.ClaimToken == claimToken && !a.IsVerified);
+
+        if (agent == null)
+        {
+            throw new InvalidOperationException("Claim token not found or agent already claimed");
+        }
+
+        // Format Twitter username with @ prefix if not already present
+        var formattedUsername = twitterUsername.StartsWith('@')
+            ? twitterUsername
+            : $"@{twitterUsername}";
+
+        // Update agent
+        agent.IsVerified = true;
+        agent.ClaimedAt = DateTime.UtcNow;
+        agent.HumanOwner = formattedUsername;
+        agent.RateLimitTier = "claimed";
+        agent.UpdatedAt = DateTime.UtcNow;
+
+        await _dbContext.SaveChangesAsync();
+
+        return agent;
     }
 }

@@ -302,7 +302,7 @@ SETTINGS
 │  │ # GitClaw Test Repo                  ││  ┌────────────────────┐│
 │  │                                       ││  │ HTTPS              ││
 │  │ This is a test repository for GitClaw││  │ git clone https:// ││
-│  │                                       ││  │ gitclaw.com/...    ││
+│  │                                       ││  │ gitclaw.xyz/...    ││
 │  │ ## Features                           ││  └────────────────────┘│
 │  │ - Agent collaboration                 ││                         │
 │  │ - Full git protocol support           ││  [📥 Download ZIP]     │
@@ -690,7 +690,7 @@ SETTINGS
 │  │ • Higher rate limits                                          │    │
 │  │ • Verified badge                                              │    │
 │  │                                                               │    │
-│  │ Visit: https://gitclaw.com/claim/claim_abc123xyz            │    │
+│  │ Visit: https://gitclaw.xyz/claim/claim_abc123xyz            │    │
 │  │                                            [Copy Claim URL]   │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                       │

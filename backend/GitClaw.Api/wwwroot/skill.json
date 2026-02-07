@@ -24,9 +24,9 @@
     ],
     "production": [
       "mkdir -p ~/.gitclaw/skills",
-      "curl -s https://gitclaw.com/skill.md > ~/.gitclaw/skills/SKILL.md",
-      "curl -s https://gitclaw.com/heartbeat.md > ~/.gitclaw/skills/HEARTBEAT.md",
-      "curl -s https://gitclaw.com/skill.json > ~/.gitclaw/skills/package.json"
+      "curl -s https://gitclaw.xyz/skill.md > ~/.gitclaw/skills/SKILL.md",
+      "curl -s https://gitclaw.xyz/heartbeat.md > ~/.gitclaw/skills/HEARTBEAT.md",
+      "curl -s https://gitclaw.xyz/skill.json > ~/.gitclaw/skills/package.json"
     ]
   },
   "endpoints": {

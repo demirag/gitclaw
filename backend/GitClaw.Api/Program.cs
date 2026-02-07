@@ -4,6 +4,9 @@ using GitClaw.Data;
 using GitClaw.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
+using Azure.Identity;
+using Azure.Core;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,35 +28,92 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // Add PostgreSQL database
-// Use Aspire if available, otherwise fallback to connection string
+// Configure Azure AD authentication for Azure PostgreSQL when deployed
 var connectionString = builder.Configuration.GetConnectionString("gitclaw");
-if (!string.IsNullOrEmpty(connectionString))
+var isAzureDeployment = !builder.Environment.IsDevelopment() &&
+                        connectionString?.Contains("postgres.database.azure.com") == true;
+
+if (isAzureDeployment)
 {
+    // Azure deployment with Entra ID (Azure AD) authentication
+    Console.WriteLine("Configuring Azure PostgreSQL with Entra ID authentication");
+    Console.WriteLine($"Connection string: {connectionString}");
+
+    // Azure automatically sets AZURE_CLIENT_ID when a managed identity is assigned to the container
+    // This is used as the PostgreSQL username for Azure AD authentication
+    var managedIdentityClientId = Environment.GetEnvironmentVariable("AZURE_CLIENT_ID");
+    Console.WriteLine($"Managed Identity Client ID: {managedIdentityClientId ?? "NOT SET (will try without username)"}");
+
+    // Build proper connection string for Azure AD authentication
+    var connStringBuilder = new NpgsqlConnectionStringBuilder(connectionString)
+    {
+        Database = "gitclaw",
+        SslMode = SslMode.Require,
+        Timeout = 30,
+        CommandTimeout = 30
+    };
+
+    // If managed identity client ID is available, use it as username
+    // Otherwise, rely on DefaultAzureCredential to figure it out
+    if (!string.IsNullOrEmpty(managedIdentityClientId))
+    {
+        connStringBuilder.Username = managedIdentityClientId;
+        Console.WriteLine("Using managed identity client ID as PostgreSQL username");
+    }
+
+    var enhancedConnectionString = connStringBuilder.ToString();
+
+    var credential = new DefaultAzureCredential();
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(enhancedConnectionString);
+
+    // Use periodic password provider for Azure AD token authentication
+    // Tokens are automatically refreshed before expiry
+    dataSourceBuilder.UsePeriodicPasswordProvider(async (_, ct) =>
+    {
+        var token = await credential.GetTokenAsync(
+            new TokenRequestContext(["https://ossrdbms-aad.database.windows.net/.default"]),
+            ct);
+        return token.Token;
+    }, TimeSpan.FromHours(1), TimeSpan.FromSeconds(10));
+
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<GitClawDbContext>(options =>
     {
-        options.UseNpgsql(connectionString, npgsqlOptions =>
+        options.UseNpgsql(dataSource, npgsqlOptions =>
         {
-            // Enable retry on failure for transient errors
             npgsqlOptions.EnableRetryOnFailure(
                 maxRetryCount: 3,
                 maxRetryDelay: TimeSpan.FromSeconds(5),
                 errorCodesToAdd: null);
-            
-            // Set command timeout (30 seconds)
             npgsqlOptions.CommandTimeout(30);
         });
-        
-        // Enable sensitive data logging in development
+    }, ServiceLifetime.Scoped);
+}
+else if (!string.IsNullOrEmpty(connectionString))
+{
+    // Local development with standard connection string
+    builder.Services.AddDbContext<GitClawDbContext>(options =>
+    {
+        options.UseNpgsql(connectionString, npgsqlOptions =>
+        {
+            npgsqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorCodesToAdd: null);
+            npgsqlOptions.CommandTimeout(30);
+        });
+
         if (builder.Environment.IsDevelopment())
         {
             options.EnableSensitiveDataLogging();
             options.EnableDetailedErrors();
         }
-    }, ServiceLifetime.Scoped);  // Explicitly set scope lifetime
+    }, ServiceLifetime.Scoped);
 }
 else
 {
-    // Use Aspire configuration
+    // Fallback: Use Aspire configuration for local PostgreSQL container
     builder.AddNpgsqlDbContext<GitClawDbContext>("gitclaw");
 }
 
@@ -65,6 +125,13 @@ builder.Services.AddScoped<IPullRequestService, PullRequestService>();
 builder.Services.AddScoped<IIssueService, IssueService>();
 builder.Services.AddScoped<IReleaseService, ReleaseService>();
 builder.Services.AddScoped<GitClaw.Core.Services.ISocialService, GitClaw.Data.Services.SocialService>();
+
+// Register TwitterService with HttpClient for oEmbed API
+builder.Services.AddHttpClient<ITwitterService, TwitterService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(10);
+    client.DefaultRequestHeaders.Add("User-Agent", "GitClaw/1.0");
+});
 
 // Configure CORS for development
 builder.Services.AddCors(options =>
@@ -130,6 +197,14 @@ app.UseSwaggerUI();
 
 app.UseCors();
 
+// Serve static frontend files in production
+// In development, Vite dev server runs separately on port 5173
+if (!app.Environment.IsDevelopment())
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 // Use rate limiting middleware (should be early in pipeline)
 app.UseRateLimiting();
 
@@ -152,5 +227,12 @@ app.MapGet("/", () => new
         repos = "/api/repositories"
     }
 });
+
+// SPA fallback for React Router (production only)
+// Serve index.html for all non-API routes to support client-side routing
+if (!app.Environment.IsDevelopment())
+{
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();

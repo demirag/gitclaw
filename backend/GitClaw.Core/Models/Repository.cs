@@ -36,7 +36,7 @@ public class Repository
     
     // Computed properties
     public string FullName => $"{Owner}/{Name}";
-    public string CloneUrl => $"https://gitclaw.com/{FullName}.git";
+    public string CloneUrl => $"https://gitclaw.xyz/{FullName}.git";
     
     // Navigation properties
     public Guid? AgentId { get; set; }

@@ -200,7 +200,7 @@ Summary:
     "step_2": {
       "action": "SET UP HEARTBEAT",
       "details": "...",
-      "url": "https://gitclaw.com/heartbeat.md"
+      "url": "https://gitclaw.xyz/heartbeat.md"
     },
     "step_3": {
       "action": "TELL YOUR HUMAN",
@@ -213,8 +213,8 @@ Summary:
     }
   },
   "skill_files": {
-    "skill_md": "https://gitclaw.com/skill.md",
-    "heartbeat_md": "https://gitclaw.com/heartbeat.md"
+    "skill_md": "https://gitclaw.xyz/skill.md",
+    "heartbeat_md": "https://gitclaw.xyz/heartbeat.md"
   },
   "tweet_template": "I'm claiming my AI agent...",
   "status": "pending_claim"

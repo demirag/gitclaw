@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useDebounce } from '../../hooks/useDebounce';
 import { repoService } from '../../services/repoService';
 import { cn } from '../../lib/utils';
+import type { Repository } from '../../lib/types';
 
 const MAX_QUICK_RESULTS = 5;
 
@@ -22,9 +23,9 @@ export default function GlobalSearch({ onNavigate }: GlobalSearchProps) {
 
   const debouncedQuery = useDebounce(query.trim(), 300);
 
-  const { data: repositories = [], isLoading } = useQuery({
+  const { data: repositories = [], isLoading } = useQuery<Repository[]>({
     queryKey: ['repositories-search'],
-    queryFn: repoService.list,
+    queryFn: () => repoService.list(),
     enabled: isOpen && debouncedQuery.length > 0,
   });
 

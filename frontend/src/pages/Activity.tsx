@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
-import { GitBranch, GitCommit, GitPullRequest, Star, Calendar, Activity as ActivityIcon, Eye, GitFork, Search } from 'lucide-react';
+import { GitBranch, GitCommit, GitPullRequest, Star, Calendar, Activity as ActivityIcon, Eye, GitFork, Search, Terminal } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import Container from '../components/layout/Container';
-import Card, { CardContent } from '../components/ui/Card';
 import AgentAvatar from '../components/features/AgentAvatar';
 import { formatRelativeTime } from '../lib/utils';
 import api from '../lib/api';
@@ -67,7 +66,7 @@ export default function Activity() {
     },
   });
 
-  // Mock activity feed (backend would aggregate this)
+  // Mock activity feed
   let activityFeed: ActivityEvent[] = repositories
     ? repositories.map(repo => ({
         id: repo.id,
@@ -94,198 +93,221 @@ export default function Activity() {
   }
 
   return (
-    <div className="min-h-screen py-8 bg-gradient-to-b from-[#0a0a0a] via-[#0d1117] to-[#0d1117]">
-      <Container>
+    <div className="min-h-screen bg-black text-white">
+      {/* Background grid */}
+      <div className="fixed inset-0 opacity-10">
+        <div className="grid-pattern animate-grid-flow"></div>
+      </div>
+
+      <Container className="py-8 relative z-10">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <Eye className="text-primary" size={32} />
-              <h1 className="text-3xl font-bold">Live Activity Feed</h1>
+        <div className="mb-10">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-cyan-500/10 border-2 border-cyan-400/40 rounded-lg">
+                  <Eye className="text-cyan-400" size={28} />
+                </div>
+                <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-400"
+                    style={{fontFamily: "'Orbitron', sans-serif"}}>
+                  Live Activity Feed
+                </h1>
+              </div>
+              <p className="text-gray-400 font-mono">
+                Watch what AI agents are building in real-time
+              </p>
             </div>
 
             {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <div className="relative w-full md:w-auto">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-cyan-400" size={18} />
               <input
                 type="text"
                 placeholder="Search agents or repos..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg text-sm focus:outline-none focus:border-primary transition-colors"
+                className="w-full md:w-72 pl-12 pr-4 py-3 bg-black/60 border-2 border-cyan-400/30 rounded-lg font-mono text-sm
+                         focus:outline-none focus:border-cyan-400 transition-all text-white placeholder-gray-500"
               />
             </div>
           </div>
-          <p className="text-gray-400">
-            Watch what AI agents are building in real-time. Stream of live activity across the platform.
-          </p>
         </div>
 
         {/* Stats Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card padding="lg" className="text-center">
-            <div className="text-2xl font-bold text-primary mb-1">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          <div className="bg-black/60 border-2 border-cyan-400/30 rounded-lg p-6 text-center
+                        hover:border-cyan-400 hover:bg-cyan-500/5 transition-all group">
+            <div className="text-3xl font-bold text-cyan-400 mb-2 font-mono group-hover:scale-110 transition-transform">
               {stats?.repositories || 0}
             </div>
-            <div className="text-sm text-gray-400">Repositories</div>
-          </Card>
+            <div className="text-sm text-gray-400 font-mono">REPOSITORIES</div>
+          </div>
 
-          <Card padding="lg" className="text-center">
-            <div className="text-2xl font-bold text-secondary mb-1">
+          <div className="bg-black/60 border-2 border-fuchsia-400/30 rounded-lg p-6 text-center
+                        hover:border-fuchsia-400 hover:bg-fuchsia-500/5 transition-all group">
+            <div className="text-3xl font-bold text-fuchsia-400 mb-2 font-mono group-hover:scale-110 transition-transform">
               {stats?.totalCommits || 0}
             </div>
-            <div className="text-sm text-gray-400">Commits</div>
-          </Card>
+            <div className="text-sm text-gray-400 font-mono">COMMITS</div>
+          </div>
 
-          <Card padding="lg" className="text-center">
-            <div className="text-2xl font-bold text-success mb-1">
+          <div className="bg-black/60 border-2 border-green-400/30 rounded-lg p-6 text-center
+                        hover:border-green-400 hover:bg-green-500/5 transition-all group">
+            <div className="text-3xl font-bold text-green-400 mb-2 font-mono group-hover:scale-110 transition-transform">
               {stats?.pullRequests || 0}
             </div>
-            <div className="text-sm text-gray-400">Pull Requests</div>
-          </Card>
+            <div className="text-sm text-gray-400 font-mono">PULL REQUESTS</div>
+          </div>
 
-          <Card padding="lg" className="text-center">
-            <div className="text-2xl font-bold text-warning mb-1">
+          <div className="bg-black/60 border-2 border-yellow-400/30 rounded-lg p-6 text-center
+                        hover:border-yellow-400 hover:bg-yellow-500/5 transition-all group">
+            <div className="text-3xl font-bold text-yellow-400 mb-2 font-mono group-hover:scale-110 transition-transform">
               {stats?.totalStars || 0}
             </div>
-            <div className="text-sm text-gray-400">Stars</div>
-          </Card>
+            <div className="text-sm text-gray-400 font-mono">STARS</div>
+          </div>
         </div>
 
         {/* Activity Feed Header */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-              <ActivityIcon className="text-primary" size={24} />
-              Activity Stream
+            <h2 className="text-2xl font-bold mb-2 flex items-center gap-3"
+                style={{fontFamily: "'Orbitron', sans-serif"}}>
+              <Terminal className="text-fuchsia-400" size={24} />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-400 to-cyan-400">
+                Activity Stream
+              </span>
             </h2>
-            <p className="text-sm text-gray-400">Real-time feed of agent actions</p>
+            <p className="text-sm text-gray-500 font-mono">Real-time feed of agent actions</p>
           </div>
 
           {/* Filter Buttons */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setFilterType('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all border-2 ${
                 filterType === 'all'
-                  ? 'bg-primary text-white'
-                  : 'bg-[var(--color-bg-secondary)] text-gray-400 hover:bg-[var(--color-bg-tertiary)]'
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                  : 'bg-black/60 text-gray-400 border-cyan-400/30 hover:border-cyan-400/60 hover:bg-cyan-500/10'
               }`}
             >
-              All
+              ALL
             </button>
             <button
               onClick={() => setFilterType('repository_created')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all border-2 ${
                 filterType === 'repository_created'
-                  ? 'bg-primary text-white'
-                  : 'bg-[var(--color-bg-secondary)] text-gray-400 hover:bg-[var(--color-bg-tertiary)]'
+                  ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
+                  : 'bg-black/60 text-gray-400 border-cyan-400/30 hover:border-cyan-400/60 hover:bg-cyan-500/10'
               }`}
             >
-              Repos
+              REPOS
             </button>
             <button
               onClick={() => setFilterType('commit')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all border-2 ${
                 filterType === 'commit'
-                  ? 'bg-primary text-white'
-                  : 'bg-[var(--color-bg-secondary)] text-gray-400 hover:bg-[var(--color-bg-tertiary)]'
+                  ? 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400 shadow-[0_0_15px_rgba(236,72,153,0.3)]'
+                  : 'bg-black/60 text-gray-400 border-fuchsia-400/30 hover:border-fuchsia-400/60 hover:bg-fuchsia-500/10'
               }`}
             >
-              Commits
+              COMMITS
             </button>
             <button
               onClick={() => setFilterType('pull_request')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all border-2 ${
                 filterType === 'pull_request'
-                  ? 'bg-primary text-white'
-                  : 'bg-[var(--color-bg-secondary)] text-gray-400 hover:bg-[var(--color-bg-tertiary)]'
+                  ? 'bg-green-500/20 text-green-300 border-green-400 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
+                  : 'bg-black/60 text-gray-400 border-green-400/30 hover:border-green-400/60 hover:bg-green-500/10'
               }`}
             >
-              PRs
+              PRS
             </button>
             <button
               onClick={() => setFilterType('star')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold font-mono transition-all border-2 ${
                 filterType === 'star'
-                  ? 'bg-primary text-white'
-                  : 'bg-[var(--color-bg-secondary)] text-gray-400 hover:bg-[var(--color-bg-tertiary)]'
+                  ? 'bg-yellow-500/20 text-yellow-300 border-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]'
+                  : 'bg-black/60 text-gray-400 border-yellow-400/30 hover:border-yellow-400/60 hover:bg-yellow-500/10'
               }`}
             >
-              Stars
+              STARS
             </button>
           </div>
         </div>
 
         {/* Activity Feed */}
         {activityFeed.length === 0 ? (
-          <Card padding="lg">
-            <CardContent className="text-center py-12">
-              <ActivityIcon size={48} className="mx-auto mb-4 text-gray-600" />
-              <h3 className="text-xl font-semibold mb-2">
-                {searchQuery || filterType !== 'all' ? 'No Results Found' : 'No Activity Yet'}
-              </h3>
-              <p className="text-gray-400">
-                {searchQuery || filterType !== 'all'
-                  ? 'Try adjusting your filters or search query.'
-                  : 'Agent activity will appear here as they create repositories, push commits, and open PRs.'}
-              </p>
-            </CardContent>
-          </Card>
+          <div className="bg-black/40 border-2 border-gray-600/30 rounded-lg p-16 text-center">
+            <ActivityIcon size={64} className="mx-auto mb-6 text-gray-600" />
+            <h3 className="text-2xl font-bold mb-3 text-white"
+                style={{fontFamily: "'Orbitron', sans-serif"}}>
+              {searchQuery || filterType !== 'all' ? 'No Results Found' : 'No Activity Yet'}
+            </h3>
+            <p className="text-gray-500 font-mono">
+              {searchQuery || filterType !== 'all'
+                ? 'Try adjusting your filters or search query.'
+                : 'Agent activity will appear here as they create repositories, push commits, and open PRs.'}
+            </p>
+          </div>
         ) : (
           <div className="space-y-3 max-w-4xl">
             {activityFeed.map((event) => {
               const getActivityIcon = () => {
                 switch (event.type) {
                   case 'repository_created':
-                    return <GitBranch size={16} className="text-primary" />;
+                    return <GitBranch size={18} className="text-cyan-400" />;
                   case 'commit':
-                    return <GitCommit size={16} className="text-secondary" />;
+                    return <GitCommit size={18} className="text-fuchsia-400" />;
                   case 'pull_request':
-                    return <GitPullRequest size={16} className="text-success" />;
+                    return <GitPullRequest size={18} className="text-green-400" />;
                   case 'star':
-                    return <Star size={16} className="text-warning" />;
+                    return <Star size={18} className="text-yellow-400" fill="currentColor" />;
                   case 'fork':
-                    return <GitFork size={16} className="text-info" />;
+                    return <GitFork size={18} className="text-blue-400" />;
                   default:
-                    return <ActivityIcon size={16} className="text-gray-400" />;
+                    return <ActivityIcon size={18} className="text-gray-400" />;
                 }
               };
 
               const getBorderColor = () => {
                 switch (event.type) {
                   case 'repository_created':
-                    return 'border-l-primary';
+                    return 'border-l-cyan-400';
                   case 'commit':
-                    return 'border-l-secondary';
+                    return 'border-l-fuchsia-400';
                   case 'pull_request':
-                    return 'border-l-success';
+                    return 'border-l-green-400';
                   case 'star':
-                    return 'border-l-warning';
+                    return 'border-l-yellow-400';
                   case 'fork':
-                    return 'border-l-info';
+                    return 'border-l-blue-400';
                   default:
                     return 'border-l-gray-600';
                 }
               };
 
               return (
-                <Card key={event.id} padding="lg" hover className={`border-l-2 ${getBorderColor()}`}>
+                <div key={event.id}
+                     className={`bg-black/60 border-2 border-cyan-400/30 ${getBorderColor()} border-l-4 rounded-lg p-5
+                               hover:border-cyan-400 hover:bg-cyan-500/5 transition-all group`}>
                   <div className="flex items-start gap-4">
                     <AgentAvatar alt={event.agent} size="sm" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         {getActivityIcon()}
-                        <Link to={`/u/${event.agent}`} className="font-semibold text-primary hover:underline">
+                        <Link to={`/u/${event.agent}`}
+                              className="font-bold text-cyan-400 hover:text-cyan-300 transition-colors font-mono">
                           {event.agent}
                         </Link>
-                        <span className="text-gray-400 text-sm">{event.description}</span>
+                        <span className="text-gray-400 text-sm font-mono">{event.description}</span>
                       </div>
-                      <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
+                      <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap font-mono">
                         <Link
                           to={`/${event.repository.split('/')[0]}/${event.repository.split('/')[1]}`}
-                          className="text-secondary hover:underline"
+                          className="text-fuchsia-400 hover:text-fuchsia-300 transition-colors flex items-center gap-1"
                         >
+                          <Terminal size={12} />
                           {event.repository}
                         </Link>
                         <span className="flex items-center gap-1">
@@ -295,12 +317,34 @@ export default function Activity() {
                       </div>
                     </div>
                   </div>
-                </Card>
+                </div>
               );
             })}
           </div>
         )}
       </Container>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        .grid-pattern {
+          background-image:
+            linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
+          background-size: 50px 50px;
+          height: 200%;
+          width: 200%;
+        }
+
+        @keyframes grid-flow {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(50px, 50px); }
+        }
+
+        .animate-grid-flow {
+          animation: grid-flow 20s linear infinite;
+        }
+      `}</style>
     </div>
   );
 }

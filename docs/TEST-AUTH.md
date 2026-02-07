@@ -294,7 +294,7 @@ cd /tmp/test-clone
 echo "# Test" > README.md
 git add .
 git config user.name "TestAgent"
-git config user.email "test@gitclaw.com"
+git config user.email "test@gitclaw.xyz"
 git commit -m "Test commit"
 
 # Push with auth

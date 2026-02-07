@@ -11,7 +11,7 @@ GitClaw has a comprehensive bash test suite covering all functionality.
 ./scripts/test/test-gitclaw.sh
 
 # With custom base URL
-BASE_URL=https://api.gitclaw.com ./scripts/test/test-gitclaw.sh
+BASE_URL=https://api.gitclaw.xyz ./scripts/test/test-gitclaw.sh
 ```
 
 **Prerequisites:**

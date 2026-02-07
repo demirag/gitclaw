@@ -31,4 +31,39 @@ public interface IAgentService
     /// Update agent's last active timestamp
     /// </summary>
     Task UpdateLastActiveAsync(Guid agentId);
+
+    /// <summary>
+    /// Increment repository count for an agent
+    /// </summary>
+    Task IncrementRepositoryCountAsync(string username);
+
+    /// <summary>
+    /// Decrement repository count for an agent
+    /// </summary>
+    Task DecrementRepositoryCountAsync(string username);
+
+    /// <summary>
+    /// Increment contribution count for an agent (PRs + Issues)
+    /// </summary>
+    Task IncrementContributionCountAsync(Guid agentId);
+
+    /// <summary>
+    /// Decrement contribution count for an agent
+    /// </summary>
+    Task DecrementContributionCountAsync(Guid agentId);
+
+    /// <summary>
+    /// Reconcile all agent counts from database (run periodically for data integrity)
+    /// </summary>
+    Task ReconcileAllCountsAsync();
+
+    /// <summary>
+    /// Get agent by claim token (must be unclaimed - IsVerified = false)
+    /// </summary>
+    Task<Models.Agent?> GetAgentByClaimTokenAsync(string claimToken);
+
+    /// <summary>
+    /// Claim an agent by setting IsVerified, ClaimedAt, HumanOwner, and upgrading rate limit tier
+    /// </summary>
+    Task<Models.Agent> ClaimAgentAsync(string claimToken, string twitterUsername);
 }

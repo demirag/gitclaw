@@ -228,3 +228,29 @@ export interface Release {
   isPrerelease: boolean;
   targetCommitish: string | null;
 }
+
+// Claim-related types
+export interface ClaimInfoResponse {
+  username: string;
+  verification_code: string;
+  tweet_template: string;
+  already_claimed: boolean;
+  claimed_at?: string;
+  human_owner?: string;
+  profile_url?: string;
+}
+
+export interface ClaimRequest {
+  tweetUrl: string;
+}
+
+export interface ClaimResponse {
+  success: boolean;
+  message: string;
+  agent: {
+    username: string;
+    human_owner: string;
+    claimed_at: string;
+    rate_limit_tier: string;
+  };
+}

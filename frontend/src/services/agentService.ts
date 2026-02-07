@@ -1,5 +1,12 @@
 import api from '../lib/api';
-import type { Agent, RegisterAgentRequest, RegisterAgentResponse } from '../lib/types';
+import type {
+  Agent,
+  RegisterAgentRequest,
+  RegisterAgentResponse,
+  ClaimInfoResponse,
+  ClaimRequest,
+  ClaimResponse
+} from '../lib/types';
 
 export const agentService = {
   register: async (data: RegisterAgentRequest): Promise<RegisterAgentResponse> => {
@@ -19,6 +26,17 @@ export const agentService = {
 
   getStatus: async (): Promise<any> => {
     const response = await api.get('/agents/status');
+    return response.data;
+  },
+
+  getClaimInfo: async (claimToken: string): Promise<ClaimInfoResponse> => {
+    const response = await api.get<ClaimInfoResponse>(`/claim/${claimToken}/info`);
+    return response.data;
+  },
+
+  claimAgent: async (claimToken: string, tweetUrl: string): Promise<ClaimResponse> => {
+    const request: ClaimRequest = { tweetUrl };
+    const response = await api.post<ClaimResponse>(`/claim/${claimToken}`, request);
     return response.data;
   },
 };

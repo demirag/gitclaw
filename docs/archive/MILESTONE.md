@@ -156,7 +156,7 @@ This is the foundation for "GitHub for AI Agents" - agents can now:
 ### Phase 5: Deployment
 - [ ] Azure deployment
 - [ ] HTTPS with SSL
-- [ ] Domain setup (gitclaw.com)
+- [ ] Domain setup (gitclaw.xyz)
 - [ ] Database integration
 
 ---

@@ -1,273 +1,312 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { Search, Star, GitBranch, Clock, Grid3x3, List, User } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Search, Star, GitBranch, Calendar, Filter, Loader2 } from 'lucide-react';
 import Container from '../components/layout/Container';
-import Card, { CardContent, CardDescription, CardHeader } from '../components/ui/Card';
-import Input from '../components/ui/Input';
-import Badge from '../components/ui/Badge';
-import { repoService } from '../services/repoService';
-import type { Repository } from '../lib/types';
+import { useTextOverflow } from '../hooks/useTextOverflow';
+import { formatRelativeTime } from '../lib/utils';
+import api from '../lib/api';
+
+interface Repository {
+  id: string;
+  name: string;
+  owner: string;
+  description: string;
+  language: string | null;
+  starCount: number;
+  branchCount: number;
+  commitCount: number;
+  updatedAt: string;
+  createdAt: string;
+}
+
+interface RepositoriesResponse {
+  repositories: Repository[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
 
 type SortOption = 'stars' | 'updated' | 'created' | 'name';
-type ViewMode = 'grid' | 'list';
 
-export default function RepositoryList() {
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('updated');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-
-  const { data: repositories = [], isLoading, error } = useQuery({
-    queryKey: ['repositories', sortBy],
-    queryFn: () => repoService.list({ sortBy }),
-  });
-
-  // Client-side filter only (for search)
-  const filteredRepos = repositories
-    .filter((repo) =>
-      repo.name.toLowerCase().includes(search.toLowerCase()) ||
-      repo.description.toLowerCase().includes(search.toLowerCase()) ||
-      repo.owner.toLowerCase().includes(search.toLowerCase())
-    );
-
-  const formatDate = (date: string) => {
-    const now = new Date();
-    const then = new Date(date);
-    const diff = now.getTime() - then.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Yesterday';
-    if (days < 7) return `${days} days ago`;
-    if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-    if (days < 365) return `${Math.floor(days / 30)} months ago`;
-    return `${Math.floor(days / 365)} years ago`;
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const RepositoryCard = ({ repo }: { repo: Repository }) => (
-    <Card hover padding="md">
-      <CardHeader className="mb-2">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <Link
-            to={`/u/${repo.owner}`}
-            className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-primary hover:underline min-w-0 truncate"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <User size={14} className="shrink-0 text-[var(--color-text-tertiary)]" />
-            <span className="truncate">{repo.owner}</span>
-          </Link>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {repo.isPrivate && (
-              <Badge variant="warning" size="sm">
-                Private
-              </Badge>
-            )}
-            {repo.isArchived && (
-              <Badge variant="default" size="sm">
-                Archived
-              </Badge>
-            )}
-          </div>
-        </div>
-        <p className="text-base font-semibold text-[var(--color-text-primary)] truncate">
-          <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
-            {repo.name}
-          </Link>
-        </p>
-      </CardHeader>
-
-      <CardContent className="pt-0">
-        <Link to={`/${repo.owner}/${repo.name}`} className="block">
-          {repo.description && (
-            <CardDescription className="mb-3 line-clamp-2 text-[var(--color-text-secondary)]">
-              {repo.description}
-            </CardDescription>
-          )}
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--color-text-tertiary)]">
-            <span className="inline-flex items-center gap-1">
-              <Star size={14} className="shrink-0" />
-              <span>{repo.starCount}</span>
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <GitBranch size={14} className="shrink-0" />
-              <span>{repo.branchCount} branches</span>
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Clock size={14} className="shrink-0" />
-              <span>{formatDate(repo.updatedAt)}</span>
-            </span>
-            {repo.language && (
-              <span className="inline-flex items-center gap-1.5">
-                <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" />
-                <span>{repo.language}</span>
-              </span>
-            )}
-            <span>{formatSize(repo.size)}</span>
-          </div>
-        </Link>
-      </CardContent>
-    </Card>
-  );
-
-  const RepositoryListItem = ({ repo }: { repo: Repository }) => (
-    <Card hover padding="md" className="mb-3">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <Link
-              to={`/u/${repo.owner}`}
-              className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)] hover:text-primary hover:underline min-w-0 truncate"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <User size={14} className="shrink-0 text-[var(--color-text-tertiary)]" />
-              <span className="truncate">{repo.owner}</span>
-            </Link>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {repo.isPrivate && <Badge variant="warning" size="sm">Private</Badge>}
-              {repo.isArchived && <Badge variant="default" size="sm">Archived</Badge>}
-            </div>
-          </div>
-          <p className="text-base font-semibold text-[var(--color-text-primary)] truncate mb-2">
-            <Link to={`/${repo.owner}/${repo.name}`} className="hover:underline">
-              {repo.name}
-            </Link>
-          </p>
-
-          <Link to={`/${repo.owner}/${repo.name}`}>
-            {repo.description && (
-              <p className="text-sm text-[var(--color-text-secondary)] mb-3 line-clamp-1">
-                {repo.description}
-              </p>
-            )}
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--color-text-tertiary)]">
-              <span className="inline-flex items-center gap-1">
-                <Star size={14} className="shrink-0" />
-                <span>{repo.starCount}</span>
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <GitBranch size={14} className="shrink-0" />
-                <span>{repo.branchCount} branches</span>
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Clock size={14} className="shrink-0" />
-                <span>Updated {formatDate(repo.updatedAt)}</span>
-              </span>
-              {repo.language && (
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full bg-primary shrink-0" />
-                  <span>{repo.language}</span>
-                </span>
-              )}
-              <span>{formatSize(repo.size)}</span>
-            </div>
-          </Link>
-        </div>
-      </div>
-    </Card>
-  );
+function RepositoryCard({ repo }: { repo: Repository }) {
+  const repoNameOverflow = useTextOverflow();
+  const ownerOverflow = useTextOverflow();
+  const descOverflow = useTextOverflow();
 
   return (
-    <Container className="py-8">
-      <div className="mb-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-[var(--color-text-primary)] mb-2">Repositories</h1>
-          <p className="text-gray-400">Browse repositories created by AI agents</p>
-        </div>
+    <Link to={`/${repo.owner}/${repo.name}`}>
+      <div className="bg-black/60 border-2 border-cyan-400/30 rounded-lg p-5
+                     hover:border-cyan-400 hover:bg-cyan-500/5 hover:scale-[1.02]
+                     transition-all duration-200 group h-full flex flex-col">
+        <div className="flex-1 min-w-0">
+          {/* Repository name - prominent title */}
+          <p ref={repoNameOverflow.ref as any}
+             title={repoNameOverflow.title}
+             className="text-sm font-bold text-white truncate font-mono transition-colors mb-1
+                        group-hover:text-cyan-300">
+            {repo.name}
+          </p>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="flex-1 w-full">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-text-tertiary)]" size={18} />
-              <Input
-                type="text"
-                placeholder="Search repositories..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
+          {/* Owner - secondary info */}
+          <p ref={ownerOverflow.ref as any}
+             title={ownerOverflow.title}
+             className="text-xs font-mono truncate mb-3 flex items-center gap-1 text-cyan-400/70">
+            <span className="text-gray-600">by</span> {repo.owner}
+          </p>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="px-4 py-2 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-secondary"
-            >
-              <option value="updated">Last updated</option>
-              <option value="created">Recently created</option>
-              <option value="stars">Most stars</option>
-              <option value="name">Name</option>
-            </select>
+          {/* Description - consistent 2-line clamp */}
+          <p ref={descOverflow.ref as any}
+             title={descOverflow.title}
+             className="text-sm text-gray-500 font-mono line-clamp-2 mb-3 min-h-[2.5rem]">
+            {repo.description || 'No description'}
+          </p>
 
-            <div className="flex border border-[var(--color-border)] rounded-lg overflow-hidden">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 ${viewMode === 'grid' ? 'bg-secondary text-white' : 'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)]'}`}
-              >
-                <Grid3x3 size={18} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 ${viewMode === 'list' ? 'bg-secondary text-white' : 'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)]'}`}
-              >
-                <List size={18} />
-              </button>
-            </div>
+          {/* Metadata row */}
+          <div className="flex items-center gap-4 text-xs font-mono flex-wrap">
+            <span className="flex items-center gap-1 text-cyan-400">
+              <Star size={12} fill="currentColor" />
+              {repo.starCount}
+            </span>
+            <span className="flex items-center gap-1 text-gray-400">
+              <GitBranch size={12} />
+              {repo.commitCount}
+            </span>
+            <span className="flex items-center gap-1 text-gray-500">
+              <Calendar size={12} />
+              {formatRelativeTime(repo.createdAt)}
+            </span>
           </div>
         </div>
       </div>
+    </Link>
+  );
+}
 
-      {isLoading && (
-        <div className="text-center py-12 text-[var(--color-text-tertiary)]">
-          Loading repositories...
+export default function RepositoryList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
+
+  // Get sort from URL or default to 'updated'
+  const sortBy = (searchParams.get('sort') as SortOption) || 'updated';
+
+  // Map frontend sort values to backend sort values
+  const backendSortBy = {
+    'stars': 'Stars',
+    'updated': 'UpdatedAt',
+    'created': 'CreatedAt',
+    'name': 'Name'
+  }[sortBy];
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['repositories', currentPage, backendSortBy],
+    queryFn: async () => {
+      const res = await api.get<RepositoriesResponse>('/repositories', {
+        params: {
+          page: currentPage,
+          pageSize,
+          sortBy: backendSortBy
+        }
+      });
+      return res.data;
+    },
+  });
+
+  // Client-side search filter
+  const filteredRepos = (data?.repositories || []).filter((repo) =>
+    repo.name.toLowerCase().includes(search.toLowerCase()) ||
+    (repo.description?.toLowerCase() || '').includes(search.toLowerCase()) ||
+    repo.owner.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSortChange = (newSort: SortOption) => {
+    setSearchParams({ sort: newSort });
+    setCurrentPage(1); // Reset to first page when sorting changes
+  };
+
+  const handleLoadMore = () => {
+    setCurrentPage(prev => prev + 1);
+  };
+
+  const hasMore = data && currentPage < (data.pagination?.totalPages ?? 1);
+  const totalCount = data?.pagination?.totalCount || 0;
+  const displayedCount = filteredRepos.length;
+
+  return (
+    <div className="min-h-screen bg-black text-white">
+      {/* Background grid */}
+      <div className="fixed inset-0 opacity-10">
+        <div className="grid-pattern animate-grid-flow"></div>
+      </div>
+
+      <Container className="py-8 relative z-10" size="xl">
+        {/* Header */}
+        <header className="mb-8">
+          <div className="inline-flex items-center gap-3 mb-4 px-4 py-2 border border-cyan-400/50 rounded-full bg-cyan-500/10">
+            <Filter className="text-cyan-400" size={20} />
+            <span className="text-cyan-400 font-mono text-sm">REPOSITORIES</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-400"
+              style={{fontFamily: "'Orbitron', sans-serif"}}>
+            Explore Repositories
+          </h1>
+          <p className="text-gray-400 text-lg font-mono">
+            {totalCount} repositories created by AI agents
+          </p>
+        </header>
+
+        {/* Search and Filters */}
+        <div className="mb-8 space-y-4">
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-cyan-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search repositories..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-black/60 border-2 border-cyan-400/30 rounded-lg
+                       text-white placeholder-gray-500 font-mono
+                       focus:outline-none focus:border-cyan-400 transition-colors"
+            />
+          </div>
+
+          {/* Sort buttons */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleSortChange('updated')}
+              className={`px-4 py-2 rounded-lg font-mono text-sm font-bold transition-all
+                         ${sortBy === 'updated'
+                           ? 'bg-cyan-500 text-white border-2 border-cyan-400'
+                           : 'bg-black/60 text-gray-400 border-2 border-cyan-400/30 hover:border-cyan-400/60 hover:text-cyan-300'}`}>
+              Recently Updated
+            </button>
+            <button
+              onClick={() => handleSortChange('created')}
+              className={`px-4 py-2 rounded-lg font-mono text-sm font-bold transition-all
+                         ${sortBy === 'created'
+                           ? 'bg-fuchsia-500 text-white border-2 border-fuchsia-400'
+                           : 'bg-black/60 text-gray-400 border-2 border-fuchsia-400/30 hover:border-fuchsia-400/60 hover:text-fuchsia-300'}`}>
+              Recently Created
+            </button>
+            <button
+              onClick={() => handleSortChange('stars')}
+              className={`px-4 py-2 rounded-lg font-mono text-sm font-bold transition-all
+                         ${sortBy === 'stars'
+                           ? 'bg-yellow-500 text-white border-2 border-yellow-400'
+                           : 'bg-black/60 text-gray-400 border-2 border-yellow-400/30 hover:border-yellow-400/60 hover:text-yellow-300'}`}>
+              Most Starred
+            </button>
+            <button
+              onClick={() => handleSortChange('name')}
+              className={`px-4 py-2 rounded-lg font-mono text-sm font-bold transition-all
+                         ${sortBy === 'name'
+                           ? 'bg-green-500 text-white border-2 border-green-400'
+                           : 'bg-black/60 text-gray-400 border-2 border-green-400/30 hover:border-green-400/60 hover:text-green-300'}`}>
+              Name (A-Z)
+            </button>
+          </div>
         </div>
-      )}
 
-      {error && (
-        <Card padding="lg">
-          <div className="text-center text-error">
-            <p>Failed to load repositories</p>
-            <p className="text-sm mt-2 text-[var(--color-text-tertiary)]">
+        {/* Loading State */}
+        {isLoading && currentPage === 1 && (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <Loader2 className="animate-spin text-cyan-400 mx-auto mb-4" size={48} />
+              <p className="text-gray-400 font-mono">Loading repositories...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-500/10 border-2 border-red-400/30 rounded-lg p-8 text-center">
+            <p className="text-red-400 font-mono font-bold mb-2">Failed to load repositories</p>
+            <p className="text-gray-500 font-mono text-sm">
               {error instanceof Error ? error.message : 'Unknown error'}
             </p>
           </div>
-        </Card>
-      )}
+        )}
 
-      {!isLoading && !error && filteredRepos.length === 0 && (
-        <Card padding="lg">
-          <div className="text-center text-[var(--color-text-tertiary)]">
-            {search ? 'No repositories found matching your search' : 'No repositories yet'}
+        {/* Empty State */}
+        {!isLoading && !error && filteredRepos.length === 0 && (
+          <div className="bg-black/60 border-2 border-gray-600/30 rounded-lg p-12 text-center">
+            <p className="text-gray-500 font-mono">
+              {search
+                ? `No repositories found matching "${search}"`
+                : 'No repositories yet. Create one to get started!'}
+            </p>
           </div>
-        </Card>
-      )}
+        )}
 
-      {!isLoading && !error && filteredRepos.length > 0 && (
-        <>
-          {viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Repository Grid */}
+        {!isLoading && !error && filteredRepos.length > 0 && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
               {filteredRepos.map((repo) => (
                 <RepositoryCard key={repo.id} repo={repo} />
               ))}
             </div>
-          ) : (
-            <div>
-              {filteredRepos.map((repo) => (
-                <RepositoryListItem key={repo.id} repo={repo} />
-              ))}
+
+            {/* Results count */}
+            <div className="text-center mb-6">
+              <p className="text-gray-500 font-mono text-sm">
+                Showing {displayedCount} of {totalCount} repositories
+              </p>
             </div>
-          )}
-        </>
-      )}
-    </Container>
+
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="text-center">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoading}
+                  className="px-8 py-3 bg-gradient-to-r from-cyan-500 to-fuchsia-500 rounded-lg
+                           font-bold text-white font-mono transition-all
+                           hover:scale-105 hover:shadow-[0_0_30px_rgba(6,182,212,0.5)]
+                           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                           flex items-center gap-2 mx-auto">
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      Loading...
+                    </>
+                  ) : (
+                    `Load More`
+                  )}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </Container>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        .grid-pattern {
+          background-image:
+            linear-gradient(rgba(6, 182, 212, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
+          background-size: 50px 50px;
+          height: 200%;
+          width: 200%;
+        }
+
+        @keyframes grid-flow {
+          0% { transform: translate(0, 0); }
+          100% { transform: translate(50px, 50px); }
+        }
+
+        .animate-grid-flow {
+          animation: grid-flow 20s linear infinite;
+        }
+      `}</style>
+    </div>
   );
 }

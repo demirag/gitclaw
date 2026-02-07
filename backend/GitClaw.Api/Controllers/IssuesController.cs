@@ -273,24 +273,45 @@ public class IssuesController : ControllerBase
         {
             // Get authenticated agent
             var agentId = HttpContext.Items["AgentId"] as Guid?;
-            if (agentId == null)
+            var agent = HttpContext.Items["Agent"] as Agent;
+
+            if (agentId == null || agent == null)
             {
                 return Unauthorized(new { error = "Authentication required" });
             }
-            
+
+            // Get repository to check ownership
+            var repository = await _repositoryService.GetRepositoryAsync(owner, repo);
+            if (repository == null)
+            {
+                return NotFound(new { error = "Repository not found" });
+            }
+
             // Get existing issue
             var issue = await _issueService.GetIssueAsync(owner, repo, number);
             if (issue == null)
             {
                 return NotFound(new { error = "Issue not found" });
             }
-            
+
+            // Authorization check: Only repository owner OR issue author can close
+            bool isRepoOwner = repository.Owner == agent.Username;
+            bool isIssueAuthor = issue.AuthorId == agentId.Value;
+
+            if (!isRepoOwner && !isIssueAuthor)
+            {
+                return StatusCode(403, new {
+                    error = "Forbidden",
+                    details = "Only the repository owner or issue author can close this issue"
+                });
+            }
+
             // Close issue
             var closedIssue = await _issueService.CloseIssueAsync(issue.Id, agentId.Value);
-            
-            _logger.LogInformation("Closed issue #{Number} for {Owner}/{Repo}", 
-                number, owner, repo);
-            
+
+            _logger.LogInformation("Closed issue #{Number} for {Owner}/{Repo} by {Agent}",
+                number, owner, repo, agent.Username);
+
             return Ok(new
             {
                 id = closedIssue.Id,
@@ -322,24 +343,45 @@ public class IssuesController : ControllerBase
         {
             // Get authenticated agent
             var agentId = HttpContext.Items["AgentId"] as Guid?;
-            if (agentId == null)
+            var agent = HttpContext.Items["Agent"] as Agent;
+
+            if (agentId == null || agent == null)
             {
                 return Unauthorized(new { error = "Authentication required" });
             }
-            
+
+            // Get repository to check ownership
+            var repository = await _repositoryService.GetRepositoryAsync(owner, repo);
+            if (repository == null)
+            {
+                return NotFound(new { error = "Repository not found" });
+            }
+
             // Get existing issue
             var issue = await _issueService.GetIssueAsync(owner, repo, number);
             if (issue == null)
             {
                 return NotFound(new { error = "Issue not found" });
             }
-            
+
+            // Authorization check: Only repository owner OR issue author can reopen
+            bool isRepoOwner = repository.Owner == agent.Username;
+            bool isIssueAuthor = issue.AuthorId == agentId.Value;
+
+            if (!isRepoOwner && !isIssueAuthor)
+            {
+                return StatusCode(403, new {
+                    error = "Forbidden",
+                    details = "Only the repository owner or issue author can reopen this issue"
+                });
+            }
+
             // Reopen issue
             var reopenedIssue = await _issueService.ReopenIssueAsync(issue.Id);
-            
-            _logger.LogInformation("Reopened issue #{Number} for {Owner}/{Repo}", 
-                number, owner, repo);
-            
+
+            _logger.LogInformation("Reopened issue #{Number} for {Owner}/{Repo} by {Agent}",
+                number, owner, repo, agent.Username);
+
             return Ok(new
             {
                 id = reopenedIssue.Id,

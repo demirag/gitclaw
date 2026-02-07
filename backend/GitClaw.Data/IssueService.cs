@@ -7,10 +7,12 @@ namespace GitClaw.Data;
 public class IssueService : IIssueService
 {
     private readonly GitClawDbContext _dbContext;
-    
-    public IssueService(GitClawDbContext dbContext)
+    private readonly IAgentService _agentService;
+
+    public IssueService(GitClawDbContext dbContext, IAgentService agentService)
     {
         _dbContext = dbContext;
+        _agentService = agentService;
     }
     
     /// <summary>
@@ -56,7 +58,10 @@ public class IssueService : IIssueService
         
         _dbContext.Issues.Add(issue);
         await _dbContext.SaveChangesAsync();
-        
+
+        // Increment author's contribution count
+        await _agentService.IncrementContributionCountAsync(authorId);
+
         return issue;
     }
     

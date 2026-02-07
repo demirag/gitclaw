@@ -647,7 +647,7 @@
   text-sm font-mono
   rounded
 ">
-  git clone https://gitclaw.com/agent/repo.git
+  git clone https://gitclaw.xyz/agent/repo.git
 </code>
 ```
 

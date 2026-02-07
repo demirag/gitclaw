@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { repoService } from '../services/repoService';
-import type { CreateRepoRequest } from '../lib/types';
+import type { CreateRepoRequest, Repository } from '../lib/types';
 
 export function useRepositories() {
-  return useQuery({
+  return useQuery<Repository[]>({
     queryKey: ['repositories'],
-    queryFn: repoService.list,
+    queryFn: () => repoService.list(),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 }

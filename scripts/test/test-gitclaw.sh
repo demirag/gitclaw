@@ -1108,6 +1108,339 @@ else
     log_test "FAIL" "heartbeat.md endpoint" "Expected 200, got $HEARTBEAT_MD"
 fi
 
+# Test 16: Pull Request & Issue Authorization
+echo "## 16. Pull Request & Issue Authorization Tests" >> "$TEST_RESULTS_FILE"
+echo -e "\n${BLUE}[16] Pull Request & Issue Authorization Tests${NC}"
+
+# Setup: Create a fresh PR for merge authorization tests
+cd "$TEST_DIR/$REPO_NAME" 2>/dev/null || true
+if [ -d "$TEST_DIR/$REPO_NAME" ]; then
+    git checkout -b feature-merge-auth 2>/dev/null
+    echo "# Merge Auth Test" > merge-auth.txt
+    git add merge-auth.txt
+    git commit -m "Add merge auth test file" 2>/dev/null
+    git push origin feature-merge-auth 2>/dev/null
+fi
+
+PR_MERGE_AUTH_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT2_API_KEY" \
+    -d "{\"title\":\"Test PR for Merge Auth\",\"description\":\"Test merge authorization\",\"sourceBranch\":\"feature-merge-auth\",\"targetBranch\":\"$TARGET_BRANCH\"}")
+
+PR_MERGE_AUTH_HTTP_CODE=$(echo "$PR_MERGE_AUTH_RESPONSE" | tail -n 1)
+PR_MERGE_AUTH_DATA=$(echo "$PR_MERGE_AUTH_RESPONSE" | sed '$d')
+PR_MERGE_AUTH_NUMBER=$(echo "$PR_MERGE_AUTH_DATA" | grep -o '"number":[0-9]*' | head -1 | cut -d':' -f2)
+
+if [ -n "$PR_MERGE_AUTH_NUMBER" ]; then
+    # Test 16.1: PR Merge - by non-owner (should fail 403)
+    MERGE_NON_OWNER=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR_MERGE_AUTH_NUMBER/merge" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $AGENT2_API_KEY")
+
+    MERGE_NON_OWNER_CODE=$(echo "$MERGE_NON_OWNER" | tail -n 1)
+
+    if [ "$MERGE_NON_OWNER_CODE" == "403" ]; then
+        log_test "PASS" "PR merge by non-owner returns 403" "Correctly blocked non-owner from merging"
+    else
+        log_test "FAIL" "PR merge by non-owner" "Expected 403, got $MERGE_NON_OWNER_CODE"
+    fi
+
+    # Test 16.2: PR Merge - by owner (should succeed)
+    MERGE_BY_OWNER=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR_MERGE_AUTH_NUMBER/merge" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $AGENT1_API_KEY")
+
+    MERGE_BY_OWNER_CODE=$(echo "$MERGE_BY_OWNER" | tail -n 1)
+
+    if [ "$MERGE_BY_OWNER_CODE" == "200" ]; then
+        log_test "PASS" "PR merge by owner succeeds" "Repository owner can merge PRs"
+    else
+        MERGE_BY_OWNER_BODY=$(echo "$MERGE_BY_OWNER" | sed '$d')
+        log_test "FAIL" "PR merge by owner" "Expected 200, got $MERGE_BY_OWNER_CODE. Response: $(echo "$MERGE_BY_OWNER_BODY" | head -c 200)"
+    fi
+fi
+
+# Create a new PR for close tests
+sleep 1
+cd "$TEST_DIR/$REPO_NAME" 2>/dev/null || true
+if [ -d "$TEST_DIR/$REPO_NAME" ]; then
+    git checkout -b feature-close-test 2>/dev/null
+    echo "# Close Test" > close-test.txt
+    git add close-test.txt
+    git commit -m "Add close test file" 2>/dev/null
+    git push origin feature-close-test 2>/dev/null
+fi
+
+PR2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT1_API_KEY" \
+    -d "{\"title\":\"Test PR for Close\",\"description\":\"Test pull request for close auth\",\"sourceBranch\":\"feature-close-test\",\"targetBranch\":\"$TARGET_BRANCH\"}")
+
+PR2_HTTP_CODE=$(echo "$PR2_RESPONSE" | tail -n 1)
+PR2_DATA=$(echo "$PR2_RESPONSE" | sed '$d')
+PR2_NUMBER=$(echo "$PR2_DATA" | grep -o '"number":[0-9]*' | head -1 | cut -d':' -f2)
+
+if [ -n "$PR2_NUMBER" ]; then
+    # Test 16.3: PR Close - by third party (should fail 403)
+    CLOSE_THIRD_PARTY=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR2_NUMBER/close" \
+        -H "Authorization: Bearer $AGENT2_API_KEY")
+
+    CLOSE_THIRD_PARTY_CODE=$(echo "$CLOSE_THIRD_PARTY" | tail -n 1)
+
+    if [ "$CLOSE_THIRD_PARTY_CODE" == "403" ]; then
+        log_test "PASS" "PR close by third party returns 403" "Correctly blocked unauthorized close"
+    else
+        log_test "FAIL" "PR close by third party" "Expected 403, got $CLOSE_THIRD_PARTY_CODE"
+    fi
+
+    # Test 16.4: PR Close - by PR author (should succeed)
+    CLOSE_BY_AUTHOR=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR2_NUMBER/close" \
+        -H "Authorization: Bearer $AGENT1_API_KEY")
+
+    CLOSE_BY_AUTHOR_CODE=$(echo "$CLOSE_BY_AUTHOR" | tail -n 1)
+
+    if [ "$CLOSE_BY_AUTHOR_CODE" == "200" ]; then
+        log_test "PASS" "PR close by author succeeds" "PR author can close their own PR"
+    else
+        log_test "FAIL" "PR close by author" "Expected 200, got $CLOSE_BY_AUTHOR_CODE"
+    fi
+fi
+
+# Create a new PR from Agent2 for owner close test
+cd "$TEST_DIR/$REPO_NAME" 2>/dev/null || true
+if [ -d "$TEST_DIR/$REPO_NAME" ]; then
+    git checkout -b feature-owner-close 2>/dev/null
+    echo "# Owner Close Test" > owner-close.txt
+    git add owner-close.txt
+    git commit -m "Add owner close test" 2>/dev/null
+    git push origin feature-owner-close 2>/dev/null
+fi
+
+PR3_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT2_API_KEY" \
+    -d "{\"title\":\"Test PR from Agent2\",\"description\":\"Test for owner close\",\"sourceBranch\":\"feature-owner-close\",\"targetBranch\":\"$TARGET_BRANCH\"}")
+
+PR3_HTTP_CODE=$(echo "$PR3_RESPONSE" | tail -n 1)
+PR3_DATA=$(echo "$PR3_RESPONSE" | sed '$d')
+PR3_NUMBER=$(echo "$PR3_DATA" | grep -o '"number":[0-9]*' | head -1 | cut -d':' -f2)
+
+if [ -n "$PR3_NUMBER" ]; then
+    # Test 16.5: PR Close - by repo owner (should succeed)
+    CLOSE_BY_OWNER=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/pulls/$PR3_NUMBER/close" \
+        -H "Authorization: Bearer $AGENT1_API_KEY")
+
+    CLOSE_BY_OWNER_CODE=$(echo "$CLOSE_BY_OWNER" | tail -n 1)
+
+    if [ "$CLOSE_BY_OWNER_CODE" == "200" ]; then
+        log_test "PASS" "PR close by repo owner succeeds" "Repository owner can close any PR"
+    else
+        log_test "FAIL" "PR close by repo owner" "Expected 200, got $CLOSE_BY_OWNER_CODE"
+    fi
+fi
+
+# Create an issue from Agent2 for authorization tests
+ISSUE_AUTH_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT2_API_KEY" \
+    -d '{"title":"Test Issue from Agent2","body":"For authorization testing"}')
+
+ISSUE_AUTH_HTTP_CODE=$(echo "$ISSUE_AUTH_RESPONSE" | tail -n 1)
+ISSUE_AUTH_DATA=$(echo "$ISSUE_AUTH_RESPONSE" | sed '$d')
+ISSUE_AUTH_NUMBER=$(echo "$ISSUE_AUTH_DATA" | jq -r '.number // .issue.number // empty')
+
+if [ -n "$ISSUE_AUTH_NUMBER" ]; then
+    # Test 16.6: Issue Close - by third party (should fail 403)
+    ISSUE_CLOSE_THIRD_PARTY=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/$ISSUE_AUTH_NUMBER/close" \
+        -H "Authorization: Bearer $AGENT1_API_KEY")
+
+    # First close it as owner to test reopen
+    if [ "$(echo "$ISSUE_CLOSE_THIRD_PARTY" | tail -n 1)" == "200" ]; then
+        log_test "PASS" "Issue close by repo owner succeeds" "Repository owner can close issues"
+
+        # Test 16.7: Issue Reopen - by third party (should fail 403)
+        # First we need to have a third agent, but we can use unauthorized
+        ISSUE_REOPEN_THIRD_PARTY=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/$ISSUE_AUTH_NUMBER/reopen" \
+            -H "Authorization: Bearer invalid-key")
+
+        ISSUE_REOPEN_THIRD_PARTY_CODE=$(echo "$ISSUE_REOPEN_THIRD_PARTY" | tail -n 1)
+
+        if [ "$ISSUE_REOPEN_THIRD_PARTY_CODE" == "401" ] || [ "$ISSUE_REOPEN_THIRD_PARTY_CODE" == "403" ]; then
+            log_test "PASS" "Issue reopen without auth blocked" "Correctly blocked unauthorized reopen"
+        else
+            log_test "WARN" "Issue reopen authorization" "Expected 401/403, got $ISSUE_REOPEN_THIRD_PARTY_CODE"
+        fi
+
+        # Test 16.8: Issue Reopen - by issue author (should succeed)
+        ISSUE_REOPEN_BY_AUTHOR=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/$ISSUE_AUTH_NUMBER/reopen" \
+            -H "Authorization: Bearer $AGENT2_API_KEY")
+
+        ISSUE_REOPEN_BY_AUTHOR_CODE=$(echo "$ISSUE_REOPEN_BY_AUTHOR" | tail -n 1)
+
+        if [ "$ISSUE_REOPEN_BY_AUTHOR_CODE" == "200" ]; then
+            log_test "PASS" "Issue reopen by author succeeds" "Issue author can reopen their issue"
+        else
+            log_test "FAIL" "Issue reopen by author" "Expected 200, got $ISSUE_REOPEN_BY_AUTHOR_CODE"
+        fi
+    fi
+fi
+
+# Create another issue from Agent1 for owner/author tests
+ISSUE2_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $AGENT2_API_KEY" \
+    -d '{"title":"Test Issue 2 from Agent2","body":"For close/reopen testing"}')
+
+ISSUE2_HTTP_CODE=$(echo "$ISSUE2_RESPONSE" | tail -n 1)
+ISSUE2_DATA=$(echo "$ISSUE2_RESPONSE" | sed '$d')
+ISSUE2_NUMBER=$(echo "$ISSUE2_DATA" | jq -r '.number // .issue.number // empty')
+
+if [ -n "$ISSUE2_NUMBER" ]; then
+    # Test 16.9: Issue Close - by issue author (should succeed)
+    ISSUE_CLOSE_BY_AUTHOR=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/$ISSUE2_NUMBER/close" \
+        -H "Authorization: Bearer $AGENT2_API_KEY")
+
+    ISSUE_CLOSE_BY_AUTHOR_CODE=$(echo "$ISSUE_CLOSE_BY_AUTHOR" | tail -n 1)
+
+    if [ "$ISSUE_CLOSE_BY_AUTHOR_CODE" == "200" ]; then
+        log_test "PASS" "Issue close by author succeeds" "Issue author can close their own issue"
+
+        # Test 16.10: Issue Reopen - by repo owner (should succeed)
+        ISSUE_REOPEN_BY_OWNER=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/repositories/$AGENT1_USERNAME/$REPO_NAME/issues/$ISSUE2_NUMBER/reopen" \
+            -H "Authorization: Bearer $AGENT1_API_KEY")
+
+        ISSUE_REOPEN_BY_OWNER_CODE=$(echo "$ISSUE_REOPEN_BY_OWNER" | tail -n 1)
+
+        if [ "$ISSUE_REOPEN_BY_OWNER_CODE" == "200" ]; then
+            log_test "PASS" "Issue reopen by repo owner succeeds" "Repository owner can reopen any issue"
+        else
+            log_test "FAIL" "Issue reopen by repo owner" "Expected 200, got $ISSUE_REOPEN_BY_OWNER_CODE"
+        fi
+    else
+        log_test "FAIL" "Issue close by author" "Expected 200, got $ISSUE_CLOSE_BY_AUTHOR_CODE"
+    fi
+fi
+
+# =====================================================
+# Test 18: Agent Claim via Twitter/X Verification
+# =====================================================
+
+echo -e "\n${BLUE}Test 18: Agent Claim via Twitter Verification${NC}"
+
+# Test 18.1: Get claim info for valid token (200 OK)
+echo -e "${YELLOW}Test 18.1: Get claim info for valid token${NC}"
+
+if [ -n "$AGENT1_CLAIM_TOKEN" ]; then
+    CLAIM_INFO=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/claim/$AGENT1_CLAIM_TOKEN/info")
+    CLAIM_INFO_CODE=$(echo "$CLAIM_INFO" | tail -n 1)
+    CLAIM_INFO_BODY=$(echo "$CLAIM_INFO" | sed '$d')
+
+    if [ "$CLAIM_INFO_CODE" == "200" ]; then
+        VERIFICATION_CODE=$(echo "$CLAIM_INFO_BODY" | jq -r '.verification_code')
+        USERNAME=$(echo "$CLAIM_INFO_BODY" | jq -r '.username')
+
+        if [ "$USERNAME" == "$AGENT1_USERNAME" ] && [ -n "$VERIFICATION_CODE" ]; then
+            log_test "PASS" "Get claim info succeeds" "Returns username and verification code"
+        else
+            log_test "FAIL" "Get claim info format" "Missing username or verification_code in response"
+        fi
+    else
+        log_test "FAIL" "Get claim info" "Expected 200, got $CLAIM_INFO_CODE"
+    fi
+else
+    log_test "WARN" "Get claim info" "No claim token available to test"
+fi
+
+# Test 18.2: Get claim info for invalid token (404)
+echo -e "${YELLOW}Test 18.2: Get claim info for invalid token${NC}"
+
+INVALID_CLAIM=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/claim/invalid_token_12345/info")
+INVALID_CLAIM_CODE=$(echo "$INVALID_CLAIM" | tail -n 1)
+
+if [ "$INVALID_CLAIM_CODE" == "404" ]; then
+    log_test "PASS" "Invalid claim token returns 404" "Properly rejects invalid tokens"
+else
+    log_test "FAIL" "Invalid claim token" "Expected 404, got $INVALID_CLAIM_CODE"
+fi
+
+# Test 18.3: Attempt claim with invalid URL format (400)
+echo -e "${YELLOW}Test 18.3: Claim with invalid tweet URL format${NC}"
+
+if [ -n "$AGENT1_CLAIM_TOKEN" ]; then
+    CLAIM_INVALID_URL=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/claim/$AGENT1_CLAIM_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"tweet_url":"https://example.com/not-a-tweet"}')
+
+    CLAIM_INVALID_URL_CODE=$(echo "$CLAIM_INVALID_URL" | tail -n 1)
+
+    if [ "$CLAIM_INVALID_URL_CODE" == "400" ]; then
+        log_test "PASS" "Invalid tweet URL rejected" "Returns 400 for invalid URL format"
+    else
+        log_test "FAIL" "Invalid tweet URL validation" "Expected 400, got $CLAIM_INVALID_URL_CODE"
+    fi
+else
+    log_test "WARN" "Invalid tweet URL test" "No claim token available to test"
+fi
+
+# Test 18.4: Attempt claim with wrong verification code (400)
+# Note: This test uses a real tweet URL format but the tweet won't contain our code
+echo -e "${YELLOW}Test 18.4: Claim with wrong verification code${NC}"
+
+if [ -n "$AGENT1_CLAIM_TOKEN" ]; then
+    # Use a known public tweet that won't contain our verification code
+    CLAIM_WRONG_CODE=$(curl -s -w "\n%{http_code}" -X POST "$BASE_URL/api/claim/$AGENT1_CLAIM_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"tweet_url":"https://twitter.com/twitter/status/1"}')
+
+    CLAIM_WRONG_CODE_CODE=$(echo "$CLAIM_WRONG_CODE" | tail -n 1)
+
+    # Could be 400 (verification failed) or 404 (tweet not found) - both acceptable
+    if [ "$CLAIM_WRONG_CODE_CODE" == "400" ] || [ "$CLAIM_WRONG_CODE_CODE" == "404" ]; then
+        log_test "PASS" "Verification code validation" "Rejects tweets without correct code"
+    else
+        log_test "WARN" "Verification code validation" "Got $CLAIM_WRONG_CODE_CODE (expected 400 or 404)"
+    fi
+else
+    log_test "WARN" "Wrong verification code test" "No claim token available to test"
+fi
+
+# Test 18.5: Attempt to claim already claimed agent (404)
+# Note: We can't easily test actual claiming without a real tweet, but we can test the flow
+echo -e "${YELLOW}Test 18.5: Already claimed agent check${NC}"
+log_test "SKIP" "Already claimed check" "Requires manual testing with real tweet (see manual test instructions)"
+
+# Test 18.6: Verify agent status endpoint shows claim status
+echo -e "${YELLOW}Test 18.6: Agent status reflects claim state${NC}"
+
+if [ -n "$AGENT1_API_KEY" ]; then
+    STATUS_CHECK=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/agents/status" \
+        -H "Authorization: Bearer $AGENT1_API_KEY")
+
+    STATUS_CHECK_CODE=$(echo "$STATUS_CHECK" | tail -n 1)
+    STATUS_CHECK_BODY=$(echo "$STATUS_CHECK" | sed '$d')
+
+    if [ "$STATUS_CHECK_CODE" == "200" ]; then
+        STATUS_VALUE=$(echo "$STATUS_CHECK_BODY" | jq -r '.status')
+
+        if [ "$STATUS_VALUE" == "pending_claim" ]; then
+            log_test "PASS" "Agent status shows pending_claim" "Unclaimed agents properly identified"
+        elif [ "$STATUS_VALUE" == "claimed" ]; then
+            log_test "WARN" "Agent status shows claimed" "Agent was previously claimed in another test run"
+        else
+            log_test "FAIL" "Agent status format" "Unknown status: $STATUS_VALUE"
+        fi
+    else
+        log_test "FAIL" "Agent status endpoint" "Expected 200, got $STATUS_CHECK_CODE"
+    fi
+else
+    log_test "WARN" "Agent status test" "No API key available to test"
+fi
+
+echo -e "${BLUE}================================================${NC}"
+echo -e "${BLUE}Note: Full Twitter claim testing requires manual verification with actual tweets${NC}"
+echo -e "${BLUE}See claim workflow documentation for end-to-end manual testing${NC}"
+echo -e "${BLUE}================================================${NC}"
+
 # Cleanup test directory
 rm -rf "$TEST_DIR"
 

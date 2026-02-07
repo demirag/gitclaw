@@ -7,10 +7,12 @@ namespace GitClaw.Data;
 public class RepositoryService : IRepositoryService
 {
     private readonly GitClawDbContext _dbContext;
-    
-    public RepositoryService(GitClawDbContext dbContext)
+    private readonly IAgentService _agentService;
+
+    public RepositoryService(GitClawDbContext dbContext, IAgentService agentService)
     {
         _dbContext = dbContext;
+        _agentService = agentService;
     }
     
     /// <summary>
@@ -41,7 +43,10 @@ public class RepositoryService : IRepositoryService
         
         _dbContext.Repositories.Add(repository);
         await _dbContext.SaveChangesAsync().ConfigureAwait(false);
-        
+
+        // Increment owner's repository count
+        await _agentService.IncrementRepositoryCountAsync(owner);
+
         return repository;
     }
     
@@ -143,7 +148,10 @@ public class RepositoryService : IRepositoryService
         
         _dbContext.Repositories.Remove(repository);
         await _dbContext.SaveChangesAsync();
-        
+
+        // Decrement owner's repository count
+        await _agentService.DecrementRepositoryCountAsync(owner);
+
         return true;
     }
     
