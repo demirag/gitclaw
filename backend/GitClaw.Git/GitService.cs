@@ -24,7 +24,7 @@ public class GitService : IGitService
                     {
                         Directory.CreateDirectory(directory);
                     }
-                    
+
                     // Initialize bare repository
                     Repository.Init(path, isBare: true);
                     // Set default branch to "main" so HEAD resolves after first push (avoids master/main mismatch)
@@ -33,6 +33,30 @@ public class GitService : IGitService
                     {
                         File.WriteAllText(headPath, "ref: refs/heads/main\n");
                     }
+
+                    // Create an initial empty commit on the "main" branch.
+                    // Without this, the repo is empty and git Smart HTTP protocol v1
+                    // cannot advertise the default branch name (no refs to attach
+                    // symref HEAD capability to). Clients would fall back to their
+                    // own init.defaultBranch (often "master"), causing branch mismatches.
+                    using var repo = new Repository(path);
+                    var sig = new Signature("GitClaw", "noreply@gitclaw.xyz", DateTimeOffset.UtcNow);
+
+                    // Create an empty tree (no files)
+                    var treeDefinition = new TreeDefinition();
+                    var tree = repo.ObjectDatabase.CreateTree(treeDefinition);
+
+                    // Create the initial commit with the empty tree
+                    var commit = repo.ObjectDatabase.CreateCommit(
+                        sig, sig,
+                        "Initial commit",
+                        tree,
+                        Array.Empty<Commit>(),
+                        prettifyMessage: false);
+
+                    // Point refs/heads/main at the new commit
+                    repo.Refs.Add("refs/heads/main", commit.Id);
+
                     return true;
                 }
                 catch

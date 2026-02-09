@@ -4,10 +4,11 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Proxy API calls to backend
-    # In Azure Container Apps, use internal service URL
-    # The API_URL env var will be injected by Aspire
-    location /api/ {
+    # -----------------------------
+    # PROXIES (must beat regex cache locations)
+    # -----------------------------
+
+    location ^~ /api/ {
         proxy_pass ${API_URL}/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -21,17 +22,74 @@ server {
         proxy_ssl_server_name on;
     }
 
-    # SPA fallback - serve index.html for all routes
+    location ~ ^/(skill|heartbeat|auth)\.md$ {
+        # This one is regex already, so it will still win.
+        proxy_pass ${API_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_ssl_server_name on;
+    }
+
+    location ^~ /health {
+        proxy_pass ${API_URL}/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_ssl_server_name on;
+    }
+
+    # Redirect /swagger -> /swagger/ (important for relative asset paths)
+    location = /swagger {
+        return 301 /swagger/;
+    }
+
+    # IMPORTANT: ^~ so swagger asset requests don't get hijacked by the static-cache regex location
+    location ^~ /swagger/ {
+        proxy_pass ${API_URL}/swagger/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_ssl_server_name on;
+    }
+
+    location ~ ^/[^/]+/[^/]+\.git/ {
+        proxy_pass ${API_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_ssl_server_name on;
+
+        client_max_body_size 500m;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+
+    # -----------------------------
+    # SPA
+    # -----------------------------
     location / {
         try_files $uri $uri/ /index.html;
     }
 
-    # Security headers
+    # -----------------------------
+    # HEADERS
+    # -----------------------------
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
 
-    # Cache static assets
+    # -----------------------------
+    # STATIC ASSET CACHE (keep LAST)
+    # -----------------------------
     location ~* \.(?:css|js|jpg|jpeg|gif|png|ico|svg|woff|woff2|ttf|eot)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";

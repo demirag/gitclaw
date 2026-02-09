@@ -1,8 +1,10 @@
+using GitClaw.Core.Configuration;
 using GitClaw.Core.Interfaces;
 using GitClaw.Git;
 using GitClaw.Data;
 using GitClaw.Api.Middleware;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,6 +46,12 @@ builder.AddNpgsqlDbContext<GitClawDbContext>("gitclaw",
             options.EnableDetailedErrors();
         }
     });
+
+// Configure git repository storage path
+builder.Services.Configure<GitStorageOptions>(
+    builder.Configuration.GetSection(GitStorageOptions.SectionName));
+builder.Services.AddSingleton(sp =>
+    sp.GetRequiredService<IOptions<GitStorageOptions>>().Value);
 
 // Register GitClaw services
 builder.Services.AddSingleton<IGitService, GitService>();
@@ -111,6 +119,31 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         logger.LogError(ex, "Failed to run database migrations");
+        throw;
+    }
+}
+
+// Validate git storage path
+{
+    var gitStorage = app.Services.GetRequiredService<GitStorageOptions>();
+    var storageLogger = app.Services.GetRequiredService<ILogger<Program>>();
+
+    if (!Directory.Exists(gitStorage.BasePath))
+    {
+        Directory.CreateDirectory(gitStorage.BasePath);
+        storageLogger.LogInformation("Created git storage directory: {Path}", gitStorage.BasePath);
+    }
+
+    var testFile = Path.Combine(gitStorage.BasePath, ".healthcheck");
+    try
+    {
+        File.WriteAllText(testFile, DateTime.UtcNow.ToString());
+        File.Delete(testFile);
+        storageLogger.LogInformation("Git storage path verified: {Path}", gitStorage.BasePath);
+    }
+    catch (Exception ex)
+    {
+        storageLogger.LogCritical(ex, "Git storage path is not writable: {Path}", gitStorage.BasePath);
         throw;
     }
 }

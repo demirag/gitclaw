@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using GitClaw.Core.Configuration;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
 using GitClaw.Data;
@@ -15,20 +16,22 @@ public class PullRequestsController : ControllerBase
     private readonly IGitService _gitService;
     private readonly GitClawDbContext _dbContext;
     private readonly ILogger<PullRequestsController> _logger;
-    private const string RepositoryBasePath = "/tmp/gitclaw-repos";
-    
+    private readonly GitStorageOptions _gitStorage;
+
     public PullRequestsController(
         IPullRequestService pullRequestService,
         IRepositoryService repositoryService,
         IGitService gitService,
         GitClawDbContext dbContext,
-        ILogger<PullRequestsController> logger)
+        ILogger<PullRequestsController> logger,
+        GitStorageOptions gitStorage)
     {
         _pullRequestService = pullRequestService;
         _repositoryService = repositoryService;
         _gitService = gitService;
         _dbContext = dbContext;
         _logger = logger;
+        _gitStorage = gitStorage;
     }
     
     /// <summary>
@@ -147,7 +150,7 @@ public class PullRequestsController : ControllerBase
                 pageSize);
 
             // Get repository path for calculating diff stats
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, repo);
             var repoExists = await _gitService.RepositoryExistsAsync(repoPath);
 
             return Ok(new
@@ -280,7 +283,7 @@ public class PullRequestsController : ControllerBase
                 return NotFound(new { error = "Pull request not found" });
             }
             
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, repo);
             
             if (!await _gitService.RepositoryExistsAsync(repoPath))
             {
@@ -346,7 +349,7 @@ public class PullRequestsController : ControllerBase
                 return NotFound(new { error = "Pull request not found" });
             }
             
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, repo);
             
             if (!await _gitService.RepositoryExistsAsync(repoPath))
             {

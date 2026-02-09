@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using GitClaw.Core.Configuration;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
 using LibGit2Sharp;
@@ -13,17 +14,19 @@ public class RepositoriesController : ControllerBase
     private readonly IGitService _gitService;
     private readonly IRepositoryService _repositoryService;
     private readonly ILogger<RepositoriesController> _logger;
-    private const string RepositoryBasePath = "/tmp/gitclaw-repos"; // TODO: Make configurable
+    private readonly GitStorageOptions _gitStorage;
     private const int MaxDescriptionLength = 1000; // Matches Repository.Description in DbContext
-    
+
     public RepositoriesController(
-        IGitService gitService, 
+        IGitService gitService,
         IRepositoryService repositoryService,
-        ILogger<RepositoriesController> logger)
+        ILogger<RepositoriesController> logger,
+        GitStorageOptions gitStorage)
     {
         _gitService = gitService;
         _repositoryService = repositoryService;
         _logger = logger;
+        _gitStorage = gitStorage;
     }
     
     /// <summary>
@@ -160,7 +163,7 @@ public class RepositoriesController : ControllerBase
             }
             
             // Generate repository path
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{sanitizedName}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, sanitizedName);
             
             // Initialize git repository (this will create directories as needed)
             var success = await _gitService.InitializeRepositoryAsync(repoPath);
@@ -230,7 +233,7 @@ public class RepositoriesController : ControllerBase
             }
             
             // Get live stats from git
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, name);
             if (await _gitService.RepositoryExistsAsync(repoPath))
             {
                 var stats = await _gitService.GetRepositoryStatsAsync(repoPath);
@@ -397,7 +400,7 @@ public class RepositoriesController : ControllerBase
             await _repositoryService.DeleteRepositoryAsync(owner, name);
             
             // Delete from filesystem
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, name);
             if (Directory.Exists(repoPath))
             {
                 Directory.Delete(repoPath, recursive: true);
@@ -433,7 +436,7 @@ public class RepositoriesController : ControllerBase
                 return NotFound(new { error = "Repository not found" });
             }
             
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, name);
             
             if (!await _gitService.RepositoryExistsAsync(repoPath))
             {
@@ -482,7 +485,7 @@ public class RepositoriesController : ControllerBase
     {
         try
         {
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, name);
             
             if (!await _gitService.RepositoryExistsAsync(repoPath))
             {
@@ -513,7 +516,7 @@ public class RepositoriesController : ControllerBase
     {
         try
         {
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, name);
             
             if (!await _gitService.RepositoryExistsAsync(repoPath))
             {
@@ -557,7 +560,7 @@ public class RepositoriesController : ControllerBase
     {
         try
         {
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, name);
             
             if (!await _gitService.RepositoryExistsAsync(repoPath))
             {
@@ -582,11 +585,29 @@ public class RepositoriesController : ControllerBase
             
             // Get the reference (default to HEAD)
             var reference = ref_ ?? "HEAD";
-            LibGit2Sharp.Commit commit;
-            
+            LibGit2Sharp.Commit? commit = null;
+
             try
             {
-                commit = repo.Lookup<LibGit2Sharp.Commit>(reference);
+                if (reference == "HEAD")
+                {
+                    commit = repo.Head.Tip;
+                }
+                else
+                {
+                    // Try as branch name first
+                    var branch = repo.Branches[reference];
+                    if (branch != null)
+                    {
+                        commit = branch.Tip;
+                    }
+                    else
+                    {
+                        // Try as SHA or tag
+                        commit = repo.Lookup<LibGit2Sharp.Commit>(reference);
+                    }
+                }
+
                 if (commit == null)
                 {
                     return NotFound(new { error = $"Reference '{reference}' not found" });
@@ -596,7 +617,7 @@ public class RepositoriesController : ControllerBase
             {
                 return NotFound(new { error = $"Reference '{reference}' not found" });
             }
-            
+
             // Get the tree
             var tree = commit.Tree;
             var targetPath = path?.Trim('/') ?? "";
@@ -683,7 +704,7 @@ public class RepositoriesController : ControllerBase
     {
         try
         {
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, name);
             
             if (!await _gitService.RepositoryExistsAsync(repoPath))
             {
@@ -693,11 +714,29 @@ public class RepositoriesController : ControllerBase
             using var repo = new LibGit2Sharp.Repository(repoPath);
             
             var reference = ref_ ?? "HEAD";
-            LibGit2Sharp.Commit commit;
-            
+            LibGit2Sharp.Commit? commit = null;
+
             try
             {
-                commit = repo.Lookup<LibGit2Sharp.Commit>(reference);
+                if (reference == "HEAD")
+                {
+                    commit = repo.Head.Tip;
+                }
+                else
+                {
+                    // Try as branch name first
+                    var branch = repo.Branches[reference];
+                    if (branch != null)
+                    {
+                        commit = branch.Tip;
+                    }
+                    else
+                    {
+                        // Try as SHA or tag
+                        commit = repo.Lookup<LibGit2Sharp.Commit>(reference);
+                    }
+                }
+
                 if (commit == null)
                 {
                     return NotFound(new { error = $"Reference '{reference}' not found" });
@@ -707,7 +746,7 @@ public class RepositoriesController : ControllerBase
             {
                 return NotFound(new { error = $"Reference '{reference}' not found" });
             }
-            
+
             if (string.IsNullOrWhiteSpace(path))
             {
                 return NotFound(new { error = "File path is required" });
@@ -800,8 +839,8 @@ public class RepositoriesController : ControllerBase
             }
             
             // Create fork repository paths
-            var sourcePath = Path.Combine(RepositoryBasePath, owner, $"{name}.git");
-            var forkPath = Path.Combine(RepositoryBasePath, agent.Username, $"{forkName}.git");
+            var sourcePath = _gitStorage.GetRepositoryPath(owner, name);
+            var forkPath = _gitStorage.GetRepositoryPath(agent.Username, forkName);
             
             // Clone the source repository
             Directory.CreateDirectory(Path.GetDirectoryName(forkPath)!);

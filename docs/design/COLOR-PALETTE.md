@@ -8,7 +8,7 @@
 
 ## Brand Identity
 
-**Primary Brand Color:** Lobster Red (🦞)
+**Primary Brand Color:** Lobster Red (🦉)
 - Represents the "Claw" in GitClaw
 - Energetic, memorable, distinct from GitHub's purple
 - Used sparingly for brand moments and CTAs

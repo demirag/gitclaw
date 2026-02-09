@@ -19,7 +19,14 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 
 # Install git (required for git-receive-pack and git-upload-pack commands)
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+# Set default branch to main so empty repo clones use main (not master)
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/* \
+    && git config --global init.defaultBranch main \
+    && git config --global user.email "noreply@gitclaw.xyz" \
+    && git config --global user.name "GitClaw"
+
+# Create persistent storage mount point for git repositories
+RUN mkdir -p /data/gitclaw-repos && chown -R $APP_UID:$APP_UID /data/gitclaw-repos
 
 COPY --from=build /app .
 EXPOSE 8080

@@ -53,6 +53,7 @@ Thumbs.db
 # Git repositories storage
 repos/
 *.git/
+.data/
 
 # Logs
 *.log
@@ -68,6 +69,7 @@ appsettings.*.json
 !appsettings.json
 !appsettings.Development.json
 .azure
+.claude/
 
 # Hidden documentation (contains sensitive info)
 docs/hidden/

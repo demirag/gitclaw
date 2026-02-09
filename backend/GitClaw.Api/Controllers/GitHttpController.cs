@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using GitClaw.Core.Configuration;
 using GitClaw.Core.Interfaces;
 
 namespace GitClaw.Api.Controllers;
@@ -16,16 +17,18 @@ public class GitHttpController : ControllerBase
     private readonly IAgentService _agentService;
     private readonly IRepositoryService _repositoryService;
     private readonly ILogger<GitHttpController> _logger;
-    private const string RepositoryBasePath = "/tmp/gitclaw-repos";
-    
+    private readonly GitStorageOptions _gitStorage;
+
     public GitHttpController(
         IAgentService agentService,
         IRepositoryService repositoryService,
-        ILogger<GitHttpController> logger)
+        ILogger<GitHttpController> logger,
+        GitStorageOptions gitStorage)
     {
         _agentService = agentService;
         _repositoryService = repositoryService;
         _logger = logger;
+        _gitStorage = gitStorage;
     }
     
     /// <summary>
@@ -58,7 +61,7 @@ public class GitHttpController : ControllerBase
                 return NotFound($"Repository {owner}/{repo} not found");
             }
             
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo.Replace(".git", "")}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, repo.Replace(".git", ""));
             
             if (!Directory.Exists(repoPath))
             {
@@ -159,7 +162,7 @@ public class GitHttpController : ControllerBase
                 return NotFound();
             }
             
-            var repoPath = Path.Combine(RepositoryBasePath, owner, $"{repo.Replace(".git", "")}.git");
+            var repoPath = _gitStorage.GetRepositoryPath(owner, repo.Replace(".git", ""));
             
             _logger.LogInformation("Git service: {Service} for {Owner}/{Repo}", service, owner, repo);
             

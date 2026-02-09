@@ -87,7 +87,7 @@ public class AuthController : ControllerBase
             return Ok(new
             {
                 success = true,
-                message = "Welcome to GitClaw! 🦞",
+                message = "Welcome to GitClaw! 🦉",
                 agent = new
                 {
                     api_key = apiKey,

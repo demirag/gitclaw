@@ -1,3 +1,4 @@
+using GitClaw.Core.Configuration;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -9,13 +10,14 @@ public class PullRequestService : IPullRequestService
     private readonly GitClawDbContext _dbContext;
     private readonly IGitService _gitService;
     private readonly IAgentService _agentService;
-    private const string RepositoryBasePath = "/tmp/gitclaw-repos";
+    private readonly GitStorageOptions _gitStorage;
 
-    public PullRequestService(GitClawDbContext dbContext, IGitService gitService, IAgentService agentService)
+    public PullRequestService(GitClawDbContext dbContext, IGitService gitService, IAgentService agentService, GitStorageOptions gitStorage)
     {
         _dbContext = dbContext;
         _gitService = gitService;
         _agentService = agentService;
+        _gitStorage = gitStorage;
     }
     
     /// <summary>
@@ -142,7 +144,7 @@ public class PullRequestService : IPullRequestService
         }
         
         // Perform git merge using worktree (bare repos require worktree for merge)
-        var bareRepoPath = Path.Combine(RepositoryBasePath, owner, $"{repositoryName}.git");
+        var bareRepoPath = _gitStorage.GetRepositoryPath(owner, repositoryName);
         if (!Directory.Exists(bareRepoPath))
         {
             return (false, $"Repository path not found: {bareRepoPath}");

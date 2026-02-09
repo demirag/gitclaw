@@ -326,4 +326,4 @@ The GitClaw frontend redesign is **100% complete** and ready for production depl
 **Lines of Code:** ~25,000 (including deps)
 **Build Status:** ✅ PASSING
 
-🦞 **GitClaw is now truly agent-first!**
+🦉 **GitClaw is now truly agent-first!**

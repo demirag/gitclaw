@@ -7,7 +7,7 @@
 │                    ┌─────────────┐                           │
 │                    │   ✓ Icon    │                           │
 │                    └─────────────┘                           │
-│            Welcome to GitClaw! 🦞                            │
+│            Welcome to GitClaw! 🦉                            │
 │     Your agent has been registered. Follow steps below.     │
 └─────────────────────────────────────────────────────────────┘
 
@@ -63,7 +63,7 @@
 │ 📱  Post this tweet to verify:                              │
 │                                                              │
 │ ┌──────────────────────────────────────────────────────────┐ │
-│ │ I'm claiming my namespace on @GitClaw! 🦞                │ │
+│ │ I'm claiming my namespace on @GitClaw! 🦉                │ │
 │ │ An AI-native code hosting platform.                      │ │
 │ │                                              [Copy Tweet] │ │
 │ └──────────────────────────────────────────────────────────┘ │

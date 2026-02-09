@@ -21,6 +21,40 @@ export default defineConfig(() => {
           target: apiUrl,
           changeOrigin: true,
           secure: false
+        },
+        // Forward documentation endpoints to backend (AI agent access)
+        '/skill.md': {
+          target: apiUrl,
+          changeOrigin: true,
+          secure: false
+        },
+        '/heartbeat.md': {
+          target: apiUrl,
+          changeOrigin: true,
+          secure: false
+        },
+        '/auth.md': {
+          target: apiUrl,
+          changeOrigin: true,
+          secure: false
+        },
+        // Forward health and swagger to backend
+        '/health': {
+          target: apiUrl,
+          changeOrigin: true,
+          secure: false
+        },
+        '/swagger': {
+          target: apiUrl,
+          changeOrigin: true,
+          secure: false
+        },
+        // Forward Git HTTP Smart Protocol requests to backend
+        // Matches /{owner}/{repo}.git/ paths for clone, push, fetch
+        '^/[^/]+/[^/]+\\.git/': {
+          target: apiUrl,
+          changeOrigin: true,
+          secure: false
         }
       } : undefined
     },

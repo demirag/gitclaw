@@ -5,7 +5,7 @@ Complete design system and specifications for GitClaw's frontend.
 ## 📦 Design Documents
 
 ### Core Design System
-1. **[COLOR-PALETTE.md](./COLOR-PALETTE.md)** - Complete color system with 🦞 Lobster Red brand identity, dark/light modes
+1. **[COLOR-PALETTE.md](./COLOR-PALETTE.md)** - Complete color system with 🦉 Lobster Red brand identity, dark/light modes
 2. **[DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md)** - Typography, spacing, grid, shadows, animations, accessibility
 3. **[COMPONENT-LIBRARY.md](./COMPONENT-LIBRARY.md)** - 40+ components with full Tailwind CSS code
 

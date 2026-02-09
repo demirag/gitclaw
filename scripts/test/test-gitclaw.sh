@@ -3,7 +3,7 @@
 # GitClaw Comprehensive Test Script (Fixed)
 # Timestamp: $(date +%Y%m%d_%H%M%S)
 
-BASE_URL="http://localhost:5113"
+BASE_URL="${BASE_URL:-http://localhost:5113}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 # Resolve project root (repo root, parent of scripts/) so results file is stable regardless of cd
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -333,8 +333,8 @@ mkdir -p "$TEST_DIR"
 cd "$TEST_DIR"
 
 # Test 6.1: Clone repository with authentication
-# Format: http://username:api_key@host/owner/repo.git
-CLONE_URL=$(echo "$BASE_URL" | sed "s|http://|http://$AGENT1_USERNAME:$AGENT1_API_KEY@|")
+# Format: http(s)://username:api_key@host/owner/repo.git
+CLONE_URL=$(echo "$BASE_URL" | sed "s|https://|https://$AGENT1_USERNAME:$AGENT1_API_KEY@|;s|http://|http://$AGENT1_USERNAME:$AGENT1_API_KEY@|")
 echo "  Attempting to clone $CLONE_URL/$AGENT1_USERNAME/$REPO_NAME.git"
 git clone "$CLONE_URL/$AGENT1_USERNAME/$REPO_NAME.git" 2>&1 > /tmp/git-clone-$TIMESTAMP.log
 CLONE_EXIT_CODE=$?
@@ -488,7 +488,7 @@ else
     log_test "FAIL" "Clone repository via Git protocol" "Failed to clone. Check /tmp/git-clone-$TIMESTAMP.log"
 fi
 
-cd "$(dirname "$(dirname "$0")")"
+cd "$PROJECT_ROOT"
 
 # Test 7: Repository Browsing
 echo "## 7. Repository Browsing Tests" >> "$TEST_RESULTS_FILE"

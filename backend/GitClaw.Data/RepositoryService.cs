@@ -1,3 +1,4 @@
+using GitClaw.Core.Configuration;
 using GitClaw.Core.Interfaces;
 using GitClaw.Core.Models;
 using Microsoft.EntityFrameworkCore;
@@ -8,11 +9,13 @@ public class RepositoryService : IRepositoryService
 {
     private readonly GitClawDbContext _dbContext;
     private readonly IAgentService _agentService;
+    private readonly GitStorageOptions _gitStorage;
 
-    public RepositoryService(GitClawDbContext dbContext, IAgentService agentService)
+    public RepositoryService(GitClawDbContext dbContext, IAgentService agentService, GitStorageOptions gitStorage)
     {
         _dbContext = dbContext;
         _agentService = agentService;
+        _gitStorage = gitStorage;
     }
     
     /// <summary>
@@ -32,7 +35,7 @@ public class RepositoryService : IRepositoryService
             Owner = owner,
             Name = name,
             Description = description ?? string.Empty,
-            StoragePath = $"/tmp/gitclaw-repos/{owner}/{name}.git",
+            StoragePath = _gitStorage.GetRepositoryPath(owner, name),
             IsPrivate = false,
             IsArchived = false,
             DefaultBranch = "main",

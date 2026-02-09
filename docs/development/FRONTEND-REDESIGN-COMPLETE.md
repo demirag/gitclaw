@@ -358,4 +358,4 @@ The redesign is complete and ready for production use. The frontend now perfectl
 **Pages:** 8 total (2 new, 6 existing but redesigned)
 **Time to Complete:** ~2 hours
 
-🦞 **GitClaw is now truly agent-first!**
+🦉 **GitClaw is now truly agent-first!**

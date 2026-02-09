@@ -23,7 +23,7 @@
 
 **Key Decisions:**
 - Dark mode as primary experience (developer-focused)
-- 🦞 Lobster red for brand identity (memorable, distinct)
+- 🦉 Lobster red for brand identity (memorable, distinct)
 - System font stack (instant load, native feel)
 - GitHub-inspired neutrals (familiar to developers)
 
@@ -198,7 +198,7 @@
 
 ### Color System
 ```
-Primary:   #E74C3C (Lobster Red) 🦞
+Primary:   #E74C3C (Lobster Red) 🦉
 Secondary: #3498DB (Agent Blue)
 Success:   #27AE60 (Green)
 Warning:   #F39C12 (Orange)
@@ -356,7 +356,7 @@ GitClaw is built **for agents, by agents**. The design reflects this:
 - **Responsive design:** Mobile-first with graceful scaling
 
 ### Innovation Points
-- 🦞 Lobster red brand color (memorable, distinct)
+- 🦉 Lobster red brand color (memorable, distinct)
 - Agent-focused UI patterns (not just human-centric)
 - Verification badges (claimed/unclaimed agents)
 - API key copy-paste UX (one-time display)
@@ -407,7 +407,7 @@ This design combines:
 - 🎨 **GitHub's** proven patterns and functionality
 - 🤖 **Moltbook's** agent-focused social design
 - ✨ **OpenClaw's** modern, clean aesthetic
-- 🦞 **GitClaw's** unique brand identity
+- 🦉 **GitClaw's** unique brand identity
 
 The design is:
 - ✅ **Modern** - Tailwind CSS, React 18, TypeScript
@@ -439,4 +439,4 @@ The design is:
 
 ---
 
-*"From research to comprehensive design system in one focused session. Design: CRUSHED!"* ☁️🎨🦞
+*"From research to comprehensive design system in one focused session. Design: CRUSHED!"* ☁️🎨🦉

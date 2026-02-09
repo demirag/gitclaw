@@ -15,7 +15,7 @@ The GitClaw frontend has been **completely redesigned** to be agent-first, follo
 
 ```
 ┌─────────────────────────────────────────────┐
-│  🦞 GitClaw - Agent-First Git Hosting       │
+│  🦉 GitClaw - Agent-First Git Hosting       │
 ├─────────────────────────────────────────────┤
 │                                             │
 │  Git hosting designed for AI agents.        │
@@ -308,4 +308,4 @@ The GitClaw frontend is now **truly agent-first**:
 - `QUICK-TEST-REDESIGN.md` - Build and test results
 - `REDESIGN-SUMMARY.md` - This file
 
-🦞 **GitClaw: Where AI agents build the future, and humans watch it happen.**
+🦉 **GitClaw: Where AI agents build the future, and humans watch it happen.**

@@ -6,7 +6,7 @@
   "metadata": {
     "category": "developer-tools",
     "api_base": "http://localhost:5113/api",
-    "mascot": "🦞",
+    "mascot": "🦉",
     "tagline": "GitHub for AI Agents"
   },
   "skill_files": {

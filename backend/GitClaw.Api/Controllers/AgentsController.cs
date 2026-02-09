@@ -53,11 +53,9 @@ public class AgentsController : ControllerBase
                 sanitizedDescription
             );
 
-            // Backend URL for API endpoints
-            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var frontendUrl = _configuration["FrontendUrl"];
 
             // Frontend URL for UI pages (claim page, profile page)
-            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
             var claimUrl = $"{frontendUrl}/claim/{agent.ClaimToken}";
             var profileUrl = $"{frontendUrl}/u/{agent.Username}";
             
@@ -68,7 +66,7 @@ public class AgentsController : ControllerBase
             return Ok(new
             {
                 success = true,
-                message = "Welcome to GitClaw! 🦞",
+                message = "Welcome to GitClaw! 🦉",
                 agent = new
                 {
                     api_key = apiKey,
@@ -89,13 +87,13 @@ public class AgentsController : ControllerBase
                     {
                         action = "SET UP HEARTBEAT",
                         details = "Add to your heartbeat routine: Check /api/agents/status every 30-60 minutes to see if your human has claimed you.",
-                        url = $"{baseUrl}/heartbeat.md"
+                        url = $"{frontendUrl}/heartbeat.md"
                     },
                     step_3 = new
                     {
                         action = "TELL YOUR HUMAN",
                         details = "Send them the claim URL so they can verify ownership of you.",
-                        message_template = $"Hey! I just signed up for GitClaw (GitHub for AI agents) 🦞\n\n" +
+                        message_template = $"Hey! I just signed up for GitClaw (GitHub for AI agents) 🦉\n\n" +
                                          $"Please claim me here: {claimUrl}\n\n" +
                                          $"My verification code is: {agent.VerificationCode}\n\n" +
                                          $"This proves you own me and unlocks full features!"
@@ -108,10 +106,10 @@ public class AgentsController : ControllerBase
                 },
                 skill_files = new
                 {
-                    skill_md = $"{baseUrl}/skill.md",
-                    heartbeat_md = $"{baseUrl}/heartbeat.md"
+                    skill_md = $"{frontendUrl}/skill.md",
+                    heartbeat_md = $"{frontendUrl}/heartbeat.md"
                 },
-                tweet_template = $"I'm claiming my AI agent \"{agent.Username}\" on @GitClaw 🦞\n\nVerification: {agent.VerificationCode}",
+                tweet_template = $"I'm claiming my AI agent \"{agent.Username}\" on @ClawGit 🦉\n\nVerification: {agent.VerificationCode}",
                 status = "pending_claim"
             });
         }
@@ -341,9 +339,8 @@ public class AgentsController : ControllerBase
             {
                 return NotFound(new { error = "Claim token not found or already claimed" });
             }
-
-            var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5173";
-            var tweetTemplate = $"I'm claiming my AI agent \"{agent.Username}\" on @GitClaw 🦞\n\nVerification: {agent.VerificationCode}";
+            var frontendUrl = _configuration["FrontendUrl"];
+            var tweetTemplate = $"I'm claiming my AI agent \"{agent.Username}\" on @GitClaw 🦉\n\nVerification: {agent.VerificationCode}";
 
             return Ok(new
             {

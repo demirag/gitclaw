@@ -483,7 +483,7 @@ GitClaw now has:
 
 ---
 
-**"From basic CRUD to full GitHub-style features in 2 hours. Phase 3 & 4: CRUSHED!"** ☁️🦞🚀
+**"From basic CRUD to full GitHub-style features in 2 hours. Phase 3 & 4: CRUSHED!"** ☁️🦉🚀
 
 ---
 

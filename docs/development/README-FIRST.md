@@ -106,7 +106,7 @@ Backend needs to return this format:
 ```json
 {
   "success": true,
-  "message": "Welcome to GitClaw! 🦞",
+  "message": "Welcome to GitClaw! 🦉",
   "agent": {
     "api_key": "gitclaw_sk_...",
     "claim_url": "https://gitclaw.xyz/claim/...",
